@@ -1,0 +1,194 @@
+import sys, os
+_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+for _p in [_root, os.path.join(_root, "GNFZ_Tests")]:
+    if _p not in sys.path: sys.path.insert(0, _p)
+
+import datetime
+import report_utils as ru
+import shared_browser as sb
+
+NZE_ENERGY_BTN = "#net-zero-energy-assessment"
+PAUSE = 1000
+
+FUELS_DATA = [
+    {"fuel": "Natural gas",                  "consumption": "1000"},
+    {"fuel": "Diesel (100% mineral diesel)", "consumption": "500"},
+    {"fuel": "LPG",                          "consumption": "250"},
+]
+MOBILE_DATA = [
+    {"fuel": "Diesel (100% mineral diesel)", "consumption": "300"},
+    {"fuel": "Gasoline",                     "consumption": "200"},
+    {"fuel": "CNG",                          "consumption": "100"},
+]
+ENERGY_DATA = [
+    {"activity": "Non Renewable Electricity from Grid\u200b", "consumption": "5000"},
+    {"activity": "Solar Energy",                              "consumption": "2000"},
+    {"activity": "Wind Energy",                               "consumption": "1500"},
+]
+
+def sc(locator):
+    try:
+        locator.evaluate("el => el.scrollIntoView({block:'center',behavior:'instant'})")
+        sb.page.wait_for_timeout(200)
+    except Exception:
+        pass
+
+def open_accordion(heading_id):
+    already = sb.page.evaluate(f"""
+        (function() {{
+            var hdr = document.getElementById('{heading_id}');
+            if (!hdr) return false;
+            var t = hdr.querySelector('[data-bs-target],[collapse_target]');
+            if (!t) return false;
+            var tid = t.getAttribute('data-bs-target') || t.getAttribute('collapse_target');
+            var c = document.querySelector(tid);
+            return c ? c.classList.contains('show') : false;
+        }})()
+    """)
+    if already: return
+    sb.page.evaluate(f"""
+        (function() {{
+            var hdr = document.getElementById('{heading_id}');
+            if (!hdr) return;
+            var btn = hdr.querySelector('[data-bs-toggle="collapse"]') || hdr.querySelector('button') || hdr.firstElementChild;
+            if (btn) btn.click();
+        }})()
+    """)
+    sb.page.wait_for_timeout(1200)
+
+def upload_file_for_row(row, num_files=1):
+    upload_dir = r"C:\Users\Promantus\OneDrive\Desktop\files"
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir, exist_ok=True)
+        
+    file_paths = []
+    for i in range(num_files):
+        ext = [".pdf", ".xlsx", ".csv", ".docx", ".txt"][i % 5]
+        p = os.path.join(upload_dir, f"test_upload_{i}{ext}")
+        if not os.path.exists(p):
+            with open(p, "w") as f: f.write(f"Test file {i}")
+        file_paths.append(p)
+
+    upload_icon = row.locator("i.bi-paperclip, img[src*='upload'], i[title*='upload']").first
+    if upload_icon.count() > 0 and upload_icon.is_visible():
+        sc(upload_icon)
+        upload_icon.click()
+        sb.page.wait_for_timeout(1000)
+        modal = sb.page.locator(".modal-content").filter(has_text="File upload").first
+        if modal.count() > 0 and modal.is_visible():
+            add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files')").first
+            if add_files.count() > 0:
+                add_files.click()
+                sb.page.wait_for_timeout(500)
+                file_input = modal.locator("input[type='file']").first
+                if file_input.count() > 0:
+                    file_input.set_input_files(file_paths)
+                    print(f"        ✅ Uploaded {num_files} files")
+                    sb.page.wait_for_timeout(1500 + (num_files * 300))
+            
+            if num_files > 1:
+                view_more = modal.locator("text='View more', .view-more-btn").first
+                if view_more.count() > 0 and view_more.is_visible():
+                    view_more.click()
+                    sb.page.wait_for_timeout(1000)
+                    print("        ✅ Clicked View more")
+                
+                showing = modal.locator("span.text-secondary", has_text="Showing").first
+                if showing.count() > 0:
+                    text = showing.inner_text()
+                    print(f"        ✅ Found text: {text}")
+                else:
+                    print("        ⚠️ Showing X of X files text not found")
+
+            close_btn = modal.locator("#modal-generic-close, .btn-close").first
+            if close_btn.count() > 0:
+                close_btn.click()
+                sb.page.wait_for_timeout(500)
+
+class TestAssessmentEnergyTab:
+
+    @classmethod
+    def setup_class(cls):
+        print("\n\nEnergy Tab: Clicking Net Zero Energy tab...")
+        sb.page.locator(NZE_ENERGY_BTN).first.click()
+        sb.page.wait_for_timeout(PAUSE)
+        sb.page.wait_for_selector("#net-zero-energy", timeout=15_000)
+        print("Energy tab ready.\n")
+
+    @classmethod
+    def teardown_class(cls):
+        print("\nAssessment Energy done. Browser stays open.\n")
+
+    def test_EN01_verify_scope1_data(self):
+        """EN01 - Scope 1 patched values from Emissions"""
+        start = datetime.datetime.now()
+        print("\nEN01: Verify Scope 1 patched data")
+        try:
+            open_accordion("energy-heading__Scope1")
+            
+            # Fuels
+            print("  Checking 1a. Fuels...")
+            for i, d in enumerate(FUELS_DATA):
+                row = sb.page.locator("[id='scope1_Fuels_table'] tbody tr").nth(i)
+                sc(row)
+                fuel_val = row.locator("input[type='search'], input[list]").first.input_value()
+                cons_val = row.locator("input[assessment_addrs*='Consumption']").first.input_value()
+                
+                cons_expected = float(d["consumption"])
+                cons_actual = float(cons_val.replace(',', ''))
+                
+                assert d["fuel"] == fuel_val, f"Row {i} Fuel mismatch: expected '{d['fuel']}', got '{fuel_val}'"
+                assert cons_expected == cons_actual, f"Row {i} Consumption mismatch: expected '{d['consumption']}', got '{cons_val}'"
+                upload_file_for_row(row)
+                print(f"    ✅ Row {i+1}: {d['fuel']} - {d['consumption']}")
+
+            # Mobile Combustion
+            print("  Checking 1b. Mobile Combustion...")
+            for i, d in enumerate(MOBILE_DATA):
+                row = sb.page.locator("[id='scope1_Mobile Combustion_table'] tbody tr").nth(i)
+                sc(row)
+                fuel_val = row.locator("input[type='search'], input[list]").first.input_value()
+                cons_val = row.locator("input[assessment_addrs*='Consumption']").first.input_value()
+                
+                cons_expected = float(d["consumption"])
+                cons_actual = float(cons_val.replace(',', ''))
+                
+                assert d["fuel"] == fuel_val, f"Row {i} Fuel mismatch: expected '{d['fuel']}', got '{fuel_val}'"
+                assert cons_expected == cons_actual, f"Row {i} Consumption mismatch: expected '{d['consumption']}', got '{cons_val}'"
+                upload_file_for_row(row)
+                print(f"    ✅ Row {i+1}: {d['fuel']} - {d['consumption']}")
+
+            ru.add_result("Assessment Energy", "EN01 - Scope 1 patched values", start, "PASSED")
+            print("EN01 PASSED")
+        except Exception as e:
+            ru.add_result("Assessment Energy", "EN01 - Scope 1 patched values", start, "FAILED", str(e))
+            raise
+
+    def test_EN02_verify_scope2_data(self):
+        """EN02 - Scope 2 patched values from Emissions"""
+        start = datetime.datetime.now()
+        print("\nEN02: Verify Scope 2 patched data")
+        try:
+            open_accordion("energy-heading__Scope2")
+            
+            # Energy
+            print("  Checking 2c. Energy...")
+            for i, d in enumerate(ENERGY_DATA):
+                row = sb.page.locator("[id='scope2_Energy_table'] tbody tr").nth(i)
+                sc(row)
+                act_val = row.locator("input[type='search'], input[list]").first.input_value()
+                cons_val = row.locator("input[assessment_addrs*='Consumption']").first.input_value()
+                
+                cons_expected = float(d["consumption"])
+                cons_actual = float(cons_val.replace(',', ''))
+                
+                assert d["activity"] == act_val, f"Row {i} Activity mismatch: expected '{d['activity']}', got '{act_val}'"
+                assert cons_expected == cons_actual, f"Row {i} Consumption mismatch: expected '{d['consumption']}', got '{cons_val}'"
+                upload_file_for_row(row)
+                print(f"    ✅ Row {i+1}: {d['activity']} - {d['consumption']}")
+
+            ru.add_result("Assessment Energy", "EN02 - Scope 2 patched values", start, "PASSED")
+            print("EN02 PASSED")
+        except Exception as e:
+            ru.add_result("Assessment Energy", "EN02 - Scope 2 patched values", start, "FAILED", str(e))
+            raise
