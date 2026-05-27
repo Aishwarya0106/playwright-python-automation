@@ -1,12 +1,6 @@
 import os
 import shared_browser as sb
-
-def sc(locator):
-    try:
-        locator.evaluate("el => el.scrollIntoView({block:'center',behavior:'instant'})")
-        sb.page.wait_for_timeout(200)
-    except Exception:
-        pass
+from pages import ui_utils as uu
 
 class NetZeroPlanPage:
     def __init__(self):
@@ -30,11 +24,11 @@ class NetZeroPlanPage:
 
     def navigate_to_net_zero_plan(self):
         """Click the Net Zero Plan tab on the main navigation menu."""
+        uu.wait_for_page_stable(self.page)
         if self.main_menu_tab.count() > 0:
-            self.main_menu_tab.locator("label").first.click(force=True)
+            uu.safe_click(self.page, self.main_menu_tab.locator("label"), wait_after=1000)
         else:
-            self.main_menu_label.first.click(force=True)
-        self.page.wait_for_timeout(1000)
+            uu.safe_click(self.page, self.main_menu_label, wait_after=1000)
         self.page.wait_for_selector("gnfz-net-zero-plan-tab", timeout=15_000)
 
     def is_sub_tab_present(self, tab_name):
@@ -43,12 +37,12 @@ class NetZeroPlanPage:
 
     def click_sub_tab(self, tab_name):
         """Click a sub-tab (e.g. 'Net Zero Emissions')."""
-        self.sub_tab_buttons.filter(has_text=tab_name).first.click()
-        self.page.wait_for_timeout(500)
+        btn = self.sub_tab_buttons.filter(has_text=tab_name)
+        uu.safe_click(self.page, btn, wait_after=500)
 
     def get_tooltip_text(self):
         """Scroll to tooltip and get its text."""
-        sc(self.tooltip_icon.first)
+        uu.sc(self.tooltip_icon.first)
         icon = self.tooltip_icon.first
         # Wait for icon to be visible before hovering
         icon.wait_for(state='visible', timeout=10_000)
@@ -60,12 +54,8 @@ class NetZeroPlanPage:
 
     def click_view_upload(self):
         """Click View/Upload and wait for the file panel."""
-        sc(self.view_upload_btn.first)
-        btn = self.view_upload_btn.first
-        # Wait for button to be visible and enabled before clicking
-        btn.wait_for(state='visible', timeout=10_000)
-        btn.click(timeout=15_000)
-        self.page.wait_for_timeout(1500)
+        btn = self.view_upload_btn
+        uu.safe_click(self.page, btn, wait_after=1500)
         self.page.wait_for_selector("#file-panel", timeout=15_000)
 
     def get_active_status_title(self):
@@ -91,10 +81,9 @@ class NetZeroPlanPage:
             with open(file_path, "w") as f:
                 f.write("Net Zero Plan Dummy Upload")
         
-        add_btn = self.add_files_btn.first
-        if add_btn.count() > 0 and add_btn.is_visible():
-            add_btn.click()
-            self.page.wait_for_timeout(500)
+        add_btn = self.add_files_btn
+        if add_btn.count() > 0 and add_btn.first.is_visible():
+            uu.safe_click(self.page, add_btn, wait_after=500)
             
             f_input = self.file_input.first
             if f_input.count() > 0:
@@ -105,7 +94,6 @@ class NetZeroPlanPage:
 
     def close_file_panel(self):
         """Close the file upload panel."""
-        icon = self.close_icon.first
-        if icon.count() > 0 and icon.is_visible():
-            icon.click()
-            self.page.wait_for_timeout(1000)
+        icon = self.close_icon
+        if icon.count() > 0 and icon.first.is_visible():
+            uu.safe_click(self.page, icon, wait_after=1000)

@@ -1,12 +1,6 @@
 import os
 import shared_browser as sb
-
-def sc(locator):
-    try:
-        locator.evaluate("el => el.scrollIntoView({block:'center',behavior:'instant'})")
-        sb.page.wait_for_timeout(200)
-    except Exception:
-        pass
+from pages import ui_utils as uu
 
 class SummaryPage:
     def __init__(self):
@@ -17,19 +11,18 @@ class SummaryPage:
         self.sub_tabs = self.page.locator("gnfz-summary-emissions-tab-business ul#myTab li button")
 
     def navigate_to_summary(self):
-        sc(self.summary_menu_tab.first)
-        self.summary_menu_tab.first.click(force=True)
-        self.page.wait_for_timeout(1000)
+        uu.wait_for_page_stable(self.page)
+        uu.safe_click(self.page, self.summary_menu_tab, wait_after=1000)
 
     def click_sub_tab(self, tab_text):
-        btn = self.sub_tabs.filter(has_text=tab_text).first
-        sc(btn)
-        self.page.wait_for_timeout(500)
-        btn.evaluate("el => el.click()")
-        self.page.wait_for_timeout(1000)
+        btn = self.sub_tabs.filter(has_text=tab_text)
+        uu.safe_click(self.page, btn, wait_after=1000)
 
     def get_summary_table_data(self):
         """Returns a dict with values from the main summary table."""
+        # Ensure no modals are blocking before attempting to read data
+        uu.close_blocking_modals(self.page)
+        
         tables = self.page.locator("table.summary-table")
         try:
             tables.first.wait_for(state="visible", timeout=10000)
@@ -89,8 +82,6 @@ class SummaryPage:
 
     def check_offset_data_present(self, year="2026"):
         """Checks if offset data for a specific year is present on the page."""
-        # Typically this might be rendered in a chart or a table below the main table
-        # We will look for text containing the year.
         element = self.page.locator(f"//*[contains(text(), '{year}')]").first
         return element.count() > 0 and element.is_visible()
 
@@ -98,4 +89,3 @@ class SummaryPage:
         """Checks if milestone data for a specific year is present on the page."""
         element = self.page.locator(f"//*[contains(text(), '{year}')]").first
         return element.count() > 0 and element.is_visible()
-

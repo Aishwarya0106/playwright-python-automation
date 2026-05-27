@@ -1,12 +1,6 @@
 import os
 import shared_browser as sb
-
-def sc(locator):
-    try:
-        locator.evaluate("el => el.scrollIntoView({block:'center',behavior:'instant'})")
-        sb.page.wait_for_timeout(200)
-    except Exception:
-        pass
+from pages import ui_utils as uu
 
 class NetZeroMilestonePage:
     def __init__(self):
@@ -19,16 +13,12 @@ class NetZeroMilestonePage:
         self.toast_msg = self.page.locator(".toast-message, .ng-trigger-toastAnimation")
 
     def navigate_to_nzm(self):
-        sc(self.nzm_menu_tab.first)
-        self.nzm_menu_tab.first.click(force=True)
-        self.page.wait_for_timeout(1000)
+        uu.wait_for_page_stable(self.page)
+        uu.safe_click(self.page, self.nzm_menu_tab, wait_after=1000)
 
     def click_sub_tab(self, tab_text):
-        btn = self.sub_tabs.filter(has_text=tab_text).first
-        sc(btn)
-        self.page.wait_for_timeout(500)
-        btn.evaluate("el => el.click()")
-        self.page.wait_for_timeout(1000)
+        btn = self.sub_tabs.filter(has_text=tab_text)
+        uu.safe_click(self.page, btn, wait_after=1000)
 
     def get_active_panel(self):
         return self.page.locator("gnfz-net-zero-milestone .tab-content > .tab-pane.active").first
@@ -38,9 +28,7 @@ class NetZeroMilestonePage:
         self.page.wait_for_timeout(500)
         add_btn = panel.locator("i.bi-plus-square").last
         if add_btn.count() > 0:
-            sc(add_btn)
-            add_btn.evaluate("el => el.click()")
-            self.page.wait_for_timeout(500)
+            uu.safe_click(self.page, add_btn, wait_after=500)
 
     def delete_all_rows_except_first(self):
         panel = self.get_active_panel()
@@ -48,16 +36,14 @@ class NetZeroMilestonePage:
         trash_btns = panel.locator("i.bi-trash")
         while trash_btns.count() > 1:
             btn = trash_btns.last
-            sc(btn)
-            btn.evaluate("el => el.click()")
-            self.page.wait_for_timeout(500)
+            uu.safe_click(self.page, btn, wait_after=500)
 
     def fill_year(self, row_index, year_str):
         panel = self.get_active_panel()
         inp = panel.locator("input.NZM_yearpicker").nth(row_index)
         try:
             inp.wait_for(state="attached", timeout=5000)
-            sc(inp)
+            uu.sc(inp)
             inp.evaluate("el => el.click()")
             self.page.wait_for_timeout(200)
             inp.evaluate(f"el => {{ el.value = '{year_str}'; el.dispatchEvent(new Event('input', {{bubbles: true}})); el.dispatchEvent(new Event('change', {{bubbles: true}})); }}")
@@ -73,7 +59,7 @@ class NetZeroMilestonePage:
         
         try:
             p_inp.wait_for(state="attached", timeout=3000)
-            sc(p_inp)
+            uu.sc(p_inp)
             p_inp.fill(str(planned_val), force=True)
             p_inp.press("Enter")
             p_inp.press("Tab") # Trigger blur for cumulative calculation
@@ -81,7 +67,7 @@ class NetZeroMilestonePage:
             
         try:
             a_inp.wait_for(state="attached", timeout=3000)
-            sc(a_inp)
+            uu.sc(a_inp)
             a_inp.fill(str(actual_val), force=True)
             a_inp.press("Enter")
             a_inp.press("Tab") # Trigger blur for cumulative calculation
@@ -97,9 +83,7 @@ class NetZeroMilestonePage:
             row = tbody_rows.nth(row_index)
             clip = row.locator("i.bi-paperclip").first
             if clip.count() > 0:
-                sc(clip)
-                clip.evaluate("el => el.click()")
-                self.page.wait_for_timeout(1500)
+                uu.safe_click(self.page, clip, wait_after=1500)
             
             file_input = self.page.locator("input[type='file']").first
             if file_input.count() > 0:
@@ -112,15 +96,11 @@ class NetZeroMilestonePage:
                 file_input.set_input_files(fpath)
                 self.page.wait_for_timeout(1500)
                 
-                upload_btn = self.page.locator("button:has-text('Upload')").filter(has_text="Upload").first
+                upload_btn = self.page.locator("button:has-text('Upload')").filter(has_text="Upload")
                 if upload_btn.count() > 0:
-                    upload_btn.evaluate("el => el.click()")
-                    self.page.wait_for_timeout(1000)
+                    uu.safe_click(self.page, upload_btn, wait_after=1000)
                     
-                close_icon = self.page.locator(".btn-close, .modal-header .close, #process-status-close-change-event").first
-                if close_icon.count() > 0:
-                    close_icon.evaluate("el => el.click()")
-                    self.page.wait_for_timeout(500)
+                uu.close_blocking_modals(self.page)
 
     def click_save(self):
         btn = self.page.locator("gnfz-net-zero-milestone #gnfz-save").first
@@ -128,23 +108,18 @@ class NetZeroMilestonePage:
             btn = self.page.locator("#gnfz-save").filter(state="visible").first
             
         if btn.count() > 0:
-            sc(btn)
-            try:
-                btn.click(force=True, timeout=2000)
-            except:
-                btn.evaluate("el => el.click()")
-            self.page.wait_for_timeout(1500)
+            uu.safe_click(self.page, btn, force=True, wait_after=200)
 
     def get_toast_message(self):
         try:
             self.toast_msg.first.wait_for(state="visible", timeout=5000)
             text = self.toast_msg.first.inner_text().strip()
-            try: self.toast_msg.first.click(force=True)
+            try: uu.safe_click(self.page, self.toast_msg, wait_after=200)
             except Exception: pass
             return text
         except Exception:
             try:
-                err_locator = self.page.locator(".text-danger, .invalid-feedback, [class*='error']")
+                err_locator = self.page.locator(".text-danger, .invalid-feedback, [class*='error'], .alert-danger, .swal2-html-container, .swal2-title, .toast-body")
                 err_locator.first.wait_for(state="visible", timeout=3000)
                 
                 # If there are multiple errors, just return the first visible one

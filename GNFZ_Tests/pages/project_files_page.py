@@ -1,12 +1,6 @@
 import os
 import shared_browser as sb
-
-def sc(locator):
-    try:
-        locator.evaluate("el => el.scrollIntoView({block:'center',behavior:'instant'})")
-        sb.page.wait_for_timeout(200)
-    except Exception:
-        pass
+from pages import ui_utils as uu
 
 class ProjectFilesPage:
     def __init__(self):
@@ -17,25 +11,25 @@ class ProjectFilesPage:
         self.side_tabs_container = self.page.locator("#menu-upload-list ul")
         
     def navigate_to_project_files(self):
-        sc(self.project_files_menu_tab.first)
-        self.project_files_menu_tab.first.click(force=True)
-        self.page.wait_for_timeout(1000)
+        uu.wait_for_page_stable(self.page)
+        uu.safe_click(self.page, self.project_files_menu_tab, wait_after=1000)
 
     def click_side_tab(self, tab_name):
         # The id of side tabs are like "gnfz-Building Info", "gnfz-Assessment", etc.
         tab_id = f"#gnfz-{tab_name}"
         btn = self.page.locator(tab_id).first
         if btn.count() > 0:
-            sc(btn)
-            btn.evaluate("el => el.click()")
-            self.page.wait_for_timeout(1000)
+            uu.safe_click(self.page, btn, wait_after=1000)
             return True
         return False
 
     def get_all_nested_folders(self):
         """Returns a list of folder names currently visible in the active side tab."""
-        # Wait to ensure folders have loaded after a navigation event
-        self.page.wait_for_timeout(2000)
+        for _ in range(10):
+            if self.page.locator("tr#files").count() > 0 or self.check_no_records_found():
+                break
+            self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(500)
         folders = []
         # Usually folders have bi-folder-fill icon
         folder_elements = self.page.locator("tr#files td:has(i.bi-folder-fill) .gnfz-file-name-ellipsis")
@@ -47,9 +41,7 @@ class ProjectFilesPage:
         """Clicks a folder to open it."""
         folder_link = self.page.locator(f"tr#files td:has(i.bi-folder-fill) .gnfz-file-name-ellipsis:has-text('{folder_name}')").first
         if folder_link.count() > 0:
-            sc(folder_link)
-            folder_link.evaluate("el => el.click()")
-            self.page.wait_for_timeout(1000)
+            uu.safe_click(self.page, folder_link, wait_after=1000)
             return True
         return False
 
@@ -58,35 +50,57 @@ class ProjectFilesPage:
         # Typically the root breadcrumb is 'Files' or similar
         breadcrumb = self.page.locator(".breadcrumbs span:has-text('Files'), .breadcrumb li:has-text('Files')").first
         if breadcrumb.count() > 0:
-            sc(breadcrumb)
-            breadcrumb.evaluate("el => el.click()")
-            self.page.wait_for_timeout(500)
+            uu.safe_click(self.page, breadcrumb, wait_after=500)
 
     def check_breadcrumb(self, name):
         """Checks if a breadcrumb with the given name is present."""
         breadcrumb = self.page.locator(f".breadcrumbs span:has-text('{name}'), .breadcrumb li:has-text('{name}'), .breadcrumb-item:has-text('{name}')").first
         if breadcrumb.count() == 0:
-            breadcrumb = self.page.locator(f"span:has-text('{name}')").first
+            breadcrumb = self.page.locator(f"a:has-text('{name}'), span:text-is('{name}')").first
         return breadcrumb.count() > 0 and breadcrumb.is_visible()
 
     def click_breadcrumb(self, name):
         """Clicks a breadcrumb with the given name."""
         breadcrumb = self.page.locator(f".breadcrumbs span:has-text('{name}'), .breadcrumb li:has-text('{name}'), .breadcrumb-item:has-text('{name}')").first
         if breadcrumb.count() == 0:
-            breadcrumb = self.page.locator(f"span:has-text('{name}')").first
+            breadcrumb = self.page.locator(f"a:has-text('{name}'), span:text-is('{name}')").first
         if breadcrumb.count() > 0:
-            sc(breadcrumb)
-            breadcrumb.evaluate("el => el.click()")
-            self.page.wait_for_timeout(2000)
+            uu.safe_click(self.page, breadcrumb, wait_after=2000)
             return True
         return False
 
     def get_file_count(self):
         """Returns the number of files (not folders) currently displayed."""
-        self.page.wait_for_timeout(1000)
+        for _ in range(10):
+            if self.page.locator("tr#files").count() > 0 or self.check_no_records_found():
+                break
+            self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(500)
         all_rows = self.page.locator("tr#files")
         folder_rows = self.page.locator("tr#files:has(i.bi-folder-fill)")
         return all_rows.count() - folder_rows.count()
+
+    def get_total_item_count(self):
+        """Returns the total number of items (files + folders) currently displayed."""
+        for _ in range(10):
+            if self.page.locator("tr#files").count() > 0 or self.check_no_records_found():
+                break
+            self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(500)
+        return self.page.locator("tr#files").count()
+
+    def get_file_names(self):
+        """Returns the names of the files in the current folder."""
+        for _ in range(10):
+            if self.page.locator("tr#files").count() > 0 or self.check_no_records_found():
+                break
+            self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(500)
+        file_names = []
+        file_rows = self.page.locator("tr#files:not(:has(i.bi-folder-fill)) .gnfz-file-name-ellipsis")
+        for i in range(file_rows.count()):
+            file_names.append(file_rows.nth(i).inner_text().strip())
+        return file_names
 
     def get_folder_item_count(self, folder_name):
         """Returns the item count string (e.g. '0 items') shown next to a folder in the root view."""
@@ -111,9 +125,7 @@ class ProjectFilesPage:
         
         # If we can click an upload button
         if add_files_btn.count() > 0 and add_files_btn.is_visible():
-            sc(add_files_btn)
-            add_files_btn.evaluate("el => el.click()")
-            self.page.wait_for_timeout(1000)
+            uu.safe_click(self.page, add_files_btn, wait_after=1000)
             
         file_input = self.page.locator("input#file-uploader-scope, input[type='file']").first
         if file_input.count() > 0:
@@ -129,15 +141,10 @@ class ProjectFilesPage:
             # If there's an 'Upload' confirmation button in a modal
             upload_confirm_btn = self.page.locator("button:has-text('Upload')").filter(has_text="Upload").first
             if upload_confirm_btn.count() > 0 and upload_confirm_btn.is_visible():
-                sc(upload_confirm_btn)
-                upload_confirm_btn.evaluate("el => el.click()")
-                self.page.wait_for_timeout(2000)
+                uu.safe_click(self.page, upload_confirm_btn, wait_after=2000)
             
             # Close modal if present
-            close_icon = self.page.locator(".btn-close, .modal-header .close").first
-            if close_icon.count() > 0 and close_icon.is_visible():
-                close_icon.evaluate("el => el.click()")
-                self.page.wait_for_timeout(500)
+            uu.close_blocking_modals(self.page)
             
             return True
         return False

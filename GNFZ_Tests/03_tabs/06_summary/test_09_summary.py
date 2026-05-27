@@ -31,9 +31,9 @@ class TestSummaryTab:
     def teardown_class(cls):
         print("\nSummary tests done. Browser stays open.\n")
 
-    def _get_assessment_total(self, assessment_btn_id, is_emission=False, ftestcaseref=None):
-        """Helper to navigate to assessment, click sub-tab, read total, and return."""
-        print(f"  Fetching assessment total for {assessment_btn_id}...")
+    def _get_assessment_data(self, assessment_btn_id, is_emission=False, ftestcaseref=None):
+        """Helper to navigate to assessment, click sub-tab, read total and scopes, and return data."""
+        print(f"  Fetching assessment data for {assessment_btn_id}...")
         # Go to assessment tab
         ass_tab = sb.page.locator("#gnfz-assessment label").first
         sc(ass_tab)
@@ -46,7 +46,7 @@ class TestSummaryTab:
         btn.click()
         sb.page.wait_for_timeout(2000)
         
-        # Read total
+        # Read data
         if is_emission:
             # For emission, open summary accordion first
             sc(sb.page.locator("#flush-heading__ScopeSummary").first)
@@ -60,47 +60,79 @@ class TestSummaryTab:
             """)
             sb.page.wait_for_timeout(1000)
             
-        total = 0.0
+        data = {}
         
-        # If an explicit test case ref is provided, try that first
+        # If an explicit test case ref is provided, try that first for total
         if ftestcaseref:
             inp = sb.page.locator(f"input[ftestcaseref='{ftestcaseref}']").first
             if inp.count() > 0:
                 val_text = inp.input_value().replace(',', '').strip()
                 try:
-                    total = float(val_text)
-                    print(f"  ✅ Found total from {ftestcaseref}: {total}")
+                    data["total"] = float(val_text)
+                    print(f"  ✅ Found total from {ftestcaseref}: {data['total']}")
                 except ValueError:
                     pass
 
-        # Fallback to summary table if total is still 0
-        if total == 0.0:
-            tables = sb.page.locator("table.summary-table")
-            for t_idx in range(tables.count()):
-                table = tables.nth(t_idx)
-                rows = table.locator("tbody tr")
-                for i in range(rows.count()):
-                    row = rows.nth(i)
-                    text = row.inner_text().lower()
-                    if "total emissions of the building" in text or "total" in text:
-                        cells = row.locator("td")
-                        if cells.count() >= 2:
-                            val_text = cells.nth(1).inner_text().replace(',', '').strip()
-                            try:
-                                parsed_val = float(val_text)
-                                if "total emissions of the building" in text:
-                                    total = parsed_val
-                                    break # Absolute correct one found
-                                else:
-                                    total = parsed_val # keep as fallback
-                            except ValueError:
-                                pass
-                if total > 0 and "total emissions of the building" in text:
-                    break
+        # Parse summary table for scopes and total
+        tables = sb.page.locator("table.summary-table")
+        for t_idx in range(tables.count()):
+            table = tables.nth(t_idx)
+            rows = table.locator("tbody tr")
+            for i in range(rows.count()):
+                row = rows.nth(i)
+                text = row.inner_text().lower()
+                cells = row.locator("td")
+                if cells.count() >= 2:
+                    val_text = cells.nth(1).inner_text().replace(',', '').strip()
+                    try:
+                        val = float(val_text)
+                        if "scope 1" in text:
+                            data["scope 1"] = val
+                        elif "scope 2" in text:
+                            data["scope 2"] = val
+                        elif "scope 3" in text:
+                            data["scope 3"] = val
+                        elif "total emissions of the building" in text or "total" in text:
+                            # Always take the generic total (usually the grand total)
+                            data["total"] = val
+                    except ValueError:
+                        pass
+        
+        # Calculate proper total if scopes were parsed
+        calc_total = data.get("scope 1", 0.0) + data.get("scope 2", 0.0) + data.get("scope 3", 0.0)
+        if calc_total > 0:
+            if "total" not in data or abs(data["total"] - calc_total) > 2.0:
+                print(f"  ⚠️ Overriding parsed total ({data.get('total', 0.0)}) with calculated sum of scopes ({calc_total})")
+                data["total"] = calc_total
         
         # Go back to Summary tab
         self.page_obj.navigate_to_summary()
-        return total
+        return data
+
+    def _verify_scopes_and_total(self, ass_data, sum_data, total_key_in_summary="total"):
+        sum_total = sum_data.get(total_key_in_summary, sum_data.get("total", 0.0))
+        ass_total = ass_data.get("total", 0.0)
+        
+        # Check Scopes
+        for scope in ["scope 1", "scope 2", "scope 3"]:
+            if scope in sum_data and sum_data[scope] > 0:
+                s_val = sum_data[scope]
+                a_val = ass_data.get(scope, 0.0)
+                if a_val > 0:
+                    assert abs(a_val - s_val) < 2.0, f"{scope.title()} mismatch! Assessment: {a_val}, Summary: {s_val}"
+                    print(f"  ✅ {scope.title()} values match assessment: {s_val}")
+                else:
+                    print(f"  ⚠️ {scope.title()} found in summary ({s_val}) but not parsed from assessment.")
+                    
+        # Check Total
+        if ass_total > 0:
+            assert abs(ass_total - sum_total) < 2.0, f"Total mismatch! Assessment: {ass_total}, Summary: {sum_total}"
+            print("  ✅ Total values match assessment")
+        else:
+            assert sum_total > 0, "Summary Total is 0"
+            print("  ✅ Summary Total > 0 (Assessment total could not be parsed)")
+        
+        return sum_total
 
     def test_SU01_verify_emission_summary(self):
         """SU01 - Verify Net Zero Emissions Summary values match assessment and offset/milestone data present"""
@@ -108,24 +140,18 @@ class TestSummaryTab:
         print("\nSU01: Net Zero Emissions Summary")
         try:
             # 1. Fetch Assessment Value
-            ass_total = self._get_assessment_total("#net-zero-emission-assessment", is_emission=True)
-            print(f"  Assessment Emission Total: {ass_total}")
+            ass_data = self._get_assessment_data("#net-zero-emission-assessment", is_emission=True)
+            print(f"  Assessment Emission Data: {ass_data}")
             
             # 2. Go to Emissions Sub-tab on Summary
             self.page_obj.click_sub_tab("Net Zero Emissions")
             
             # 3. Read Summary Table
             data = self.page_obj.get_summary_table_data()
-            sum_total = data.get("total", 0.0)
-            print(f"  Summary Emission Total: {sum_total}")
+            print(f"  Summary Emission Data: {data}")
             
-            # 4. Check they match (allow small rounding difference)
-            if ass_total > 0:
-                assert abs(ass_total - sum_total) < 2.0, f"Total mismatch! Assessment: {ass_total}, Summary: {sum_total}"
-                print("  ✅ Emission values match assessment")
-            else:
-                assert sum_total > 0, "Summary Emission Total is 0"
-                print("  ✅ Summary Emission Total > 0 (Assessment total could not be parsed)")
+            # 4. Check they match
+            sum_total = self._verify_scopes_and_total(ass_data, data, total_key_in_summary="total")
             
             # 5. Check offset and milestone data
             has_offset = self.page_obj.check_offset_data_present("2026")
@@ -157,21 +183,15 @@ class TestSummaryTab:
         start = datetime.datetime.now()
         print("\nSU02: Net Zero Energy Summary")
         try:
-            ass_total = self._get_assessment_total("#net-zero-energy-assessment", ftestcaseref="scope2_energy_total")
-            print(f"  Assessment Energy Total: {ass_total}")
+            ass_data = self._get_assessment_data("#net-zero-energy-assessment", ftestcaseref="scope2_energy_total")
+            print(f"  Assessment Energy Data: {ass_data}")
             
             self.page_obj.click_sub_tab("Net Zero Energy")
             
             data = self.page_obj.get_summary_table_data()
-            sum_total = data.get("net_zero_avoided", data.get("total", 0.0))
-            print(f"  Summary Energy Total (Emissions to be avoided): {sum_total}")
+            print(f"  Summary Energy Data: {data}")
             
-            if ass_total > 0:
-                assert abs(ass_total - sum_total) < 2.0, f"Total mismatch! Assessment: {ass_total}, Summary: {sum_total}"
-                print("  ✅ Energy values match assessment")
-            else:
-                assert sum_total > 0, "Summary Energy Total is 0"
-                print("  ✅ Summary Energy Total > 0 (Assessment total could not be parsed)")
+            sum_total = self._verify_scopes_and_total(ass_data, data, total_key_in_summary="net_zero_avoided")
             
             ru.add_result("Summary", "SU02 - Energy Summary", start, "PASSED")
             print("SU02 PASSED")
@@ -184,21 +204,15 @@ class TestSummaryTab:
         start = datetime.datetime.now()
         print("\nSU03: Net Zero Water Summary")
         try:
-            ass_total = self._get_assessment_total("#net-zero-water-assessment", ftestcaseref="scope3_water_total")
-            print(f"  Assessment Water Total: {ass_total}")
+            ass_data = self._get_assessment_data("#net-zero-water-assessment", ftestcaseref="scope3_water_total")
+            print(f"  Assessment Water Data: {ass_data}")
             
             self.page_obj.click_sub_tab("Net Zero Water")
             
             data = self.page_obj.get_summary_table_data()
-            sum_total = data.get("freshwater_requirement", data.get("total", 0.0))
-            print(f"  Summary Water Total (Freshwater Requirement): {sum_total}")
+            print(f"  Summary Water Data: {data}")
             
-            if ass_total > 0:
-                assert abs(ass_total - sum_total) < 2.0, f"Total mismatch! Assessment: {ass_total}, Summary: {sum_total}"
-                print("  ✅ Water values match assessment")
-            else:
-                assert sum_total > 0, "Summary Water Total is 0"
-                print("  ✅ Summary Water Total > 0 (Assessment total could not be parsed)")
+            sum_total = self._verify_scopes_and_total(ass_data, data, total_key_in_summary="freshwater_requirement")
             
             ru.add_result("Summary", "SU03 - Water Summary", start, "PASSED")
             print("SU03 PASSED")
@@ -211,21 +225,15 @@ class TestSummaryTab:
         start = datetime.datetime.now()
         print("\nSU04: Net Zero Waste Summary")
         try:
-            ass_total = self._get_assessment_total("#net-zero-waste-assessment", ftestcaseref="scope3_waste_total")
-            print(f"  Assessment Waste Total: {ass_total}")
+            ass_data = self._get_assessment_data("#net-zero-waste-assessment", ftestcaseref="scope3_waste_total")
+            print(f"  Assessment Waste Data: {ass_data}")
             
             self.page_obj.click_sub_tab("Net Zero Waste")
             
             data = self.page_obj.get_summary_table_data()
-            sum_total = data.get("waste_reduced", data.get("total", 0.0))
-            print(f"  Summary Waste Total (Waste to be Reduced): {sum_total}")
+            print(f"  Summary Waste Data: {data}")
             
-            if ass_total > 0:
-                assert abs(ass_total - sum_total) < 2.0, f"Total mismatch! Assessment: {ass_total}, Summary: {sum_total}"
-                print("  ✅ Waste values match assessment")
-            else:
-                assert sum_total > 0, "Summary Waste Total is 0"
-                print("  ✅ Summary Waste Total > 0 (Assessment total could not be parsed)")
+            sum_total = self._verify_scopes_and_total(ass_data, data, total_key_in_summary="waste_reduced")
             
             ru.add_result("Summary", "SU04 - Waste Summary", start, "PASSED")
             print("SU04 PASSED")

@@ -135,46 +135,85 @@ def upload_file_for_row(row, num_files=1):
             with open(p, "w") as f: f.write(f"Test file {i}")
         file_paths.append(p)
 
-    upload_icon = row.locator("i.bi-paperclip, img[src*='upload'], i[title*='upload']").first
-    if upload_icon.count() > 0 and upload_icon.is_visible():
+    upload_icon = row.locator("i.bi-paperclip, img[src*='upload'], i[title*='upload'], i[class*='paperclip']").first
+    if upload_icon.count() > 0:
         sc(upload_icon)
-        upload_icon.click()
-        sb.page.wait_for_timeout(1000)
+        try:
+            upload_icon.click(timeout=3000)
+        except:
+            upload_icon.evaluate("el => el.click()")
+        
+        sb.page.wait_for_timeout(1500)
+        
         modal = sb.page.locator(".modal-content").filter(has_text="File upload").first
+        if modal.count() == 0:
+            modal = sb.page.locator(".modal-content").last
+
         if modal.count() > 0 and modal.is_visible():
-            add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files')").first
+            add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
+            if add_files.count() == 0:
+                add_files = sb.page.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
+
             if add_files.count() > 0:
-                add_files.click()
-                sb.page.wait_for_timeout(500)
-                file_input = modal.locator("input[type='file']").first
+                sc(add_files)
+                try:
+                    add_files.click(timeout=3000)
+                except:
+                    add_files.evaluate("el => el.click()")
+                sb.page.wait_for_timeout(1000)
+
+                file_input = modal.locator("input[type='file'], input#file-uploader-scope").first
+                if file_input.count() == 0:
+                    file_input = sb.page.locator("input[type='file']").first
+                
                 if file_input.count() > 0:
                     file_input.set_input_files(file_paths)
                     print(f"        ✅ Uploaded {num_files} files")
                     sb.page.wait_for_timeout(1500 + (num_files * 300))
-            
-            if num_files > 1:
-                view_more = modal.locator("text='View more', .view-more-btn").first
-                if view_more.count() > 0 and view_more.is_visible():
-                    view_more.click()
-                    sb.page.wait_for_timeout(1000)
-                    print("        ✅ Clicked View more")
-                
-                showing = modal.locator("span.text-secondary", has_text="Showing").first
-                if showing.count() > 0:
-                    text = showing.inner_text()
-                    print(f"        ✅ Found text: {text}")
                 else:
-                    print("        ⚠️ Showing X of X files text not found")
+                    print("        ⚠️ File input not found")
+                
+                if num_files > 1:
+                    view_more = modal.locator("text='View more', .view-more-btn").first
+                    if view_more.count() > 0 and view_more.is_visible():
+                        try:
+                            view_more.click(timeout=3000)
+                        except:
+                            view_more.evaluate("el => el.click()")
+                        sb.page.wait_for_timeout(1000)
+                        print("        ✅ Clicked View more")
+                        
+                    showing = modal.locator("span.text-secondary", has_text="Showing").first
+                    if showing.count() > 0:
+                        print(f"        ✅ Found text: {showing.inner_text()}")
+                    else:
+                        print("        ⚠️ Showing X of X files text not found")
+            else:
+                print("        ⚠️ 'Add files' button not found")
 
-            close_btn = modal.locator("#modal-generic-close, .btn-close").first
+            close_btn = modal.locator("#modal-generic-close, .btn-close, .modal-header .close").first
+            if close_btn.count() == 0:
+                close_btn = sb.page.locator("#modal-generic-close, .btn-close, .modal-header .close").first
+                
             if close_btn.count() > 0:
-                close_btn.click()
+                try:
+                    close_btn.click(timeout=3000)
+                except:
+                    close_btn.evaluate("el => el.click()")
+                sb.page.wait_for_timeout(500)
+            else:
+                sb.page.keyboard.press("Escape")
                 sb.page.wait_for_timeout(500)
 
 def log_t(name):
     print(f"\n  ── {name} ──")
 
-
+def click_save():
+    save_btn = sb.page.locator("button:has-text('Save'):visible, #gnfz-save:visible, .btn:has-text('Save'):visible").first
+    sc(save_btn)
+    sb.page.wait_for_timeout(500)
+    save_btn.click(force=True, timeout=10000)
+    sb.page.wait_for_timeout(2500)
 def verify_table_total(table_sel, sum_attr=None):
     sb.page.evaluate("""
         if(document.activeElement) {
@@ -377,6 +416,10 @@ class TestAssessmentWaterTab:
 
             verify_table_total("[id='Freshwater Provision_Freshwater provision_table']")
 
+            # Save the entire form
+            print("  Clicking Save to persist inputs...")
+            click_save()
+
             ru.add_result("Assessment Water", "WA01 - Fill all water tables with 3 rows + uploads", start, "PASSED")
             print("WA01 PASSED")
         except Exception as e:
@@ -395,7 +438,8 @@ class TestAssessmentWaterTab:
             for i, d in enumerate(POTABLE_DATA):
                 row = sb.page.locator("[id='Consumption_Potable_table'] tbody tr").nth(i)
                 sc(row)
-                t_val = row.locator("input[type='search'], input[list]").first.input_value()
+                t_ng = row.locator(".ng-value-label").first
+                t_val = t_ng.inner_text().strip() if t_ng.count() > 0 and t_ng.is_visible() else row.locator("input[type='search'], input[list]").first.input_value()
                 q_val = row.locator("input[assessment_addrs*='Quantity(kLd)']").first.input_value()
                 assert d["type"] == t_val, f"Mismatch Type: {d['type']} vs {t_val}"
                 
@@ -409,7 +453,8 @@ class TestAssessmentWaterTab:
             for i, d in enumerate(ONSITE_DATA):
                 row = sb.page.locator("[id='Supply_Recycled on-site_table'] tbody tr").nth(i)
                 sc(row)
-                t_val = row.locator("input[type='search'], input[list]").first.input_value()
+                t_ng = row.locator(".ng-value-label").first
+                t_val = t_ng.inner_text().strip() if t_ng.count() > 0 and t_ng.is_visible() else row.locator("input[type='search'], input[list]").first.input_value()
                 q_val = row.locator("input[assessment_addrs*='Quantity(kLd)']").first.input_value()
                 assert d["type"] == t_val, f"Mismatch Type: {d['type']} vs {t_val}"
                 expected_q = float(d["qty"])
@@ -421,7 +466,8 @@ class TestAssessmentWaterTab:
             for i, d in enumerate(FRESHWATER_PROV_DATA):
                 row = sb.page.locator("[id='Freshwater Provision_Freshwater provision_table'] tbody tr").nth(i)
                 sc(row)
-                t_val = row.locator("input[type='search'], input[list]").first.input_value()
+                t_ng = row.locator(".ng-value-label").first
+                t_val = t_ng.inner_text().strip() if t_ng.count() > 0 and t_ng.is_visible() else row.locator("input[type='search'], input[list]").first.input_value()
                 q_val = row.locator("input[assessment_addrs*='Quantity']").first.input_value()
                 assert d["type"] == t_val, f"Mismatch Type: {d['type']} vs {t_val}"
                 expected_q = float(d["qty"])

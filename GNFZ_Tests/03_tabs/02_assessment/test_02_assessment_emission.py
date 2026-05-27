@@ -314,52 +314,82 @@ def check_ef(row):
 
 
 
-def upload_file_for_row(row):
-    """Uploads a file for a specific row via the paperclip icon."""
+def upload_file_for_row(row, num_files=1):
     upload_dir = r"C:\Users\Promantus\OneDrive\Desktop\files"
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, "test_upload.txt")
-    if not os.path.exists(file_path):
-        with open(file_path, "w") as f:
-            f.write("Test file for GNFZ automation upload.")
+        
+    file_paths = []
+    for i in range(num_files):
+        ext = [".pdf", ".xlsx", ".csv", ".docx", ".txt"][i % 5]
+        p = os.path.join(upload_dir, f"test_upload_{i}{ext}")
+        if not os.path.exists(p):
+            with open(p, "w") as f: f.write(f"Test file {i}")
+        file_paths.append(p)
 
-    # Find paperclip icon
     upload_icon = row.locator("i.bi-paperclip, img[src*='upload'], i[title*='upload'], i[class*='paperclip']").first
     if upload_icon.count() > 0:
         sc(upload_icon)
-        # Use JS click to bypass any obscured element issues (common in wide Scope 3 tables)
-        upload_icon.evaluate("el => el.click()")
+        try:
+            upload_icon.click(timeout=3000)
+        except:
+            upload_icon.evaluate("el => el.click()")
+        
         sb.page.wait_for_timeout(1500)
-
-        # Grab the active modal
-        modal = sb.page.locator(".modal-content:visible").first
+        
+        modal = sb.page.locator(".modal-content").filter(has_text="File upload").first
         if modal.count() == 0:
             modal = sb.page.locator(".modal-content").last
-            
+
         if modal.count() > 0 and modal.is_visible():
             add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
+            if add_files.count() == 0:
+                add_files = sb.page.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
+
             if add_files.count() > 0:
                 sc(add_files)
-                add_files.evaluate("el => el.click()")
-                sb.page.wait_for_timeout(500)
+                try:
+                    add_files.click(timeout=3000)
+                except:
+                    add_files.evaluate("el => el.click()")
+                sb.page.wait_for_timeout(1000)
 
                 file_input = modal.locator("input[type='file'], input#file-uploader-scope").first
+                if file_input.count() == 0:
+                    file_input = sb.page.locator("input[type='file']").first
+                
                 if file_input.count() > 0:
-                    file_input.set_input_files(file_path)
-                    print(f"        ✅ Uploaded file: {file_path}")
-                    sb.page.wait_for_timeout(1500)
+                    file_input.set_input_files(file_paths)
+                    print(f"        ✅ Uploaded {num_files} files")
+                    sb.page.wait_for_timeout(1500 + (num_files * 300))
                 else:
                     print("        ⚠️ File input not found")
+                
+                if num_files > 1:
+                    view_more = modal.locator("text='View more', .view-more-btn").first
+                    if view_more.count() > 0 and view_more.is_visible():
+                        try:
+                            view_more.click(timeout=3000)
+                        except:
+                            view_more.evaluate("el => el.click()")
+                        sb.page.wait_for_timeout(1000)
+                        print("        ✅ Clicked View more")
             else:
                 print("        ⚠️ 'Add files' button not found")
 
             close_btn = modal.locator("#modal-generic-close, .btn-close, .modal-header .close").first
-            if close_btn.count() > 0 and close_btn.is_visible():
-                close_btn.evaluate("el => el.click()")
+            if close_btn.count() == 0:
+                close_btn = sb.page.locator("#modal-generic-close, .btn-close, .modal-header .close").first
+                
+            if close_btn.count() > 0:
+                try:
+                    close_btn.click(timeout=3000)
+                except:
+                    close_btn.evaluate("el => el.click()")
                 sb.page.wait_for_timeout(500)
-        else:
-            print("        ⚠️ File upload modal did not appear")
+            else:
+                sb.page.keyboard.press("Escape")
+                sb.page.wait_for_timeout(500)
 
 
 def fill_row_std(table_sel, r_idx, first_val, consumption):

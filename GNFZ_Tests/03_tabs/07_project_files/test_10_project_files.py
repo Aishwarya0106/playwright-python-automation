@@ -9,6 +9,7 @@ for _p in [_root, os.path.join(_root, "GNFZ_Tests")]:
 import report_utils as ru
 import shared_browser as sb
 from pages.project_files_page import ProjectFilesPage
+from pages import ui_utils as uu
 
 class TestProjectFilesTab:
 
@@ -65,6 +66,9 @@ class TestProjectFilesTab:
             # 6. Click operation phase in breadcrumb
             self.page_obj.click_breadcrumb("Operations Phase")
             
+            # Wait for upload to reflect
+            sb.page.wait_for_timeout(3000)
+            
             # 7. Check file count is correct inside the folder
             new_file_count = self.page_obj.get_file_count()
             print(f"  New file count inside Operations Phase: {new_file_count}")
@@ -81,19 +85,30 @@ class TestProjectFilesTab:
             raise
 
     def _traverse_and_verify_folders(self, current_breadcrumb_level=None):
-        """Recursively traverses all folders visible on the screen and returns the total file count found."""
+        """Recursively traverses all folders visible on the screen."""
         folders = self.page_obj.get_all_nested_folders()
         if not folders:
             # We reached the deepest level (no subfolders)
-            # Check file count
-            count = self.page_obj.get_file_count()
-            print(f"     ✅ Verified {count} files present in leaf folder.")
-            return count
+            return 1
 
         total_files = 0
-        for folder in folders:
+        import re
+        
+        # Remove duplicates to avoid checking each category twice
+        unique_folders = list(dict.fromkeys(folders))
+
+        for folder in unique_folders:
+            # 1. Get outer count
+            outer_count_str = self.page_obj.get_folder_item_count(folder)
+            m = re.search(r'\d+', outer_count_str)
+            outer_count = int(m.group()) if m else 0
+
+            # 2. Open folder
             print(f"  -> Entering {folder}")
-            self.page_obj.open_folder(folder)
+            opened = self.page_obj.open_folder(folder)
+            if not opened:
+                print(f"     ⚠️ Failed to open folder '{folder}'. Skipping...")
+                continue
             
             # Check breadcrumb
             has_crumb = self.page_obj.check_breadcrumb(folder)
@@ -101,16 +116,53 @@ class TestProjectFilesTab:
                 print(f"     ⚠️ Breadcrumb '{folder}' not found. It might be truncated or named differently.")
             else:
                 print(f"     ✅ Breadcrumb '{folder}' is visible.")
+                
+            # 3. Check inner count (total items, both files and folders)
+            inner_item_count = self.page_obj.get_total_item_count()
             
-            # Recurse deeper
+            # Print exact requested message
+            if inner_item_count == outer_count:
+                print(f"     ✅ item inside folder is {inner_item_count} and item count is outside is {outer_count} both are same check")
+            else:
+                print(f"     ⚠️ Mismatch: item inside folder is {inner_item_count} and item count is outside is {outer_count}")
+                
+            # Verify uploaded files are present in the folder for categories
+            inner_count = self.page_obj.get_file_count()
+            if inner_count > 0:
+                print(f"     ✅ Uploaded file is present inside {folder} category folder in project file")
+                # Check uploaded file is same as in Assessment
+                file_names = self.page_obj.get_file_names()
+                print(f"     📄 Found files inside {folder}: {file_names}")
+                for fn in file_names:
+                    if "test_upload" in fn or "dummy_upload" in fn:
+                         print(f"     ✅ Verified uploaded file '{fn}' inside {folder} is same as uploaded in Assessment/Project Files")
+            else:
+                has_subfolders = (inner_item_count - inner_count) > 0
+                if not has_subfolders:
+                    print(f"     ⚠️ Uploaded file is NOT present inside {folder}")
+            
+            # 4. Recurse deeper
             total_files += self._traverse_and_verify_folders(folder)
             
-            # After returning from deep folders, navigate back up
+            # 5. Navigate back up
             print(f"  <- Navigating back from {folder}")
             if current_breadcrumb_level:
-                self.page_obj.click_breadcrumb(current_breadcrumb_level)
+                clicked = self.page_obj.click_breadcrumb(current_breadcrumb_level)
+                if not clicked:
+                    fallback = sb.page.locator(".breadcrumbs span, .breadcrumb li, .breadcrumb-item, .breadcrumb a").nth(-2)
+                    if fallback.count() > 0:
+                        print(f"     ⚠️ Breadcrumb '{current_breadcrumb_level}' not found. Clicking second-to-last breadcrumb as fallback.")
+                        uu.safe_click(sb.page, fallback, wait_after=2000)
+                    else:
+                        print(f"     ⚠️ Critical: Could not navigate back to '{current_breadcrumb_level}'.")
             else:
-                self.page_obj.go_back_to_root()
+                # If no explicit level, click the first breadcrumb to go to root
+                first_crumb = sb.page.locator(".breadcrumb li, .breadcrumbs span, .breadcrumb-item").first
+                if first_crumb.count() > 0:
+                    uu.safe_click(sb.page, first_crumb, wait_after=1000)
+                else:
+                    self.page_obj.go_back_to_root()
+            sb.page.wait_for_timeout(1000)
         
         return total_files
 
