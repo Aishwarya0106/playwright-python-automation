@@ -2,12 +2,27 @@ import os
 import time
 
 def wait_for_page_stable(page, timeout=30000):
-    """Wait for network and DOM to be stable. Handles slow environments gracefully."""
+    """Wait for network, DOM, and loading spinners/loaders to be stable."""
     try:
         page.wait_for_load_state("domcontentloaded", timeout=timeout)
-        page.wait_for_load_state("networkidle", timeout=timeout)
+        # Use a shorter timeout for networkidle because Angular often has background polling
+        page.wait_for_load_state("networkidle", timeout=5000)
     except Exception as e:
         print(f"Warning: Page stability wait timeout or error: {e}")
+
+    # Wait for loaders/spinners to disappear to avoid click interception
+    try:
+        spinners = page.locator(".spinner-border, ngx-spinner, .loader, [class*='spinner'], [class*='loader']")
+        count = spinners.count()
+        for i in range(count):
+            spinner = spinners.nth(i)
+            if spinner.count() > 0 and spinner.is_visible():
+                print(f"  [SPINNER] Waiting for visible loader/spinner to disappear...")
+                spinner.wait_for(state="hidden", timeout=15000)
+                # Wait briefly to let page stabilize after loader hides
+                page.wait_for_timeout(500)
+    except Exception as spinner_err:
+        print(f"Warning waiting for spinners: {spinner_err}")
 
 def close_blocking_modals(page):
     """Detect and close global blocking modals (e.g. #ng-modal-generic)."""
@@ -58,9 +73,12 @@ def sc(locator):
 
 def safe_click(page, locator, force=False, timeout=10000, wait_after=500):
     """
-    Robust click that handles interception by closing modals and retrying.
+    Robust click that handles interception by waiting for loaders, closing modals, and retrying.
     This replaces naive .click() and evaluate("el.click()").
     """
+    # Wait for page stability and active loading spinners first
+    wait_for_page_stable(page)
+
     try:
         locator.first.wait_for(state="attached", timeout=timeout)
         sc(locator.first)
@@ -76,8 +94,10 @@ def safe_click(page, locator, force=False, timeout=10000, wait_after=500):
     except Exception as e:
         err_str = str(e).lower()
         if "intercept" in err_str or "timeout" in err_str:
-            print(f"Click intercepted or timeout. Clearing modals... ({e})")
+            print(f"Click intercepted or timeout. Clearing modals and re-waiting for loaders... ({e})")
             close_blocking_modals(page)
+            # Re-wait for any loaders that might have appeared
+            wait_for_page_stable(page)
             # Second attempt
             try:
                 locator.first.click(force=force, timeout=5000)

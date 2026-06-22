@@ -335,53 +335,76 @@ def upload_file_for_row(row, num_files=1):
         except:
             upload_icon.evaluate("el => el.click()")
         
-        sb.page.wait_for_timeout(1500)
+        sb.page.wait_for_timeout(2000) # wait for modal to fully open
         
         modal = sb.page.locator(".modal-content").filter(has_text="File upload").first
         if modal.count() == 0:
             modal = sb.page.locator(".modal-content").last
 
         if modal.count() > 0 and modal.is_visible():
-            add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
+            add_files = modal.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files'), button:has-text('Choose files'), button:has-text('Browse')").first
             if add_files.count() == 0:
                 add_files = sb.page.locator("#gnfz-files-add-more, a:has-text('Add files'), button:has-text('Add Files')").first
 
-            if add_files.count() > 0:
-                sc(add_files)
+            # Try method 1: Intercept file chooser by clicking the "Add files" button
+            upload_done = False
+            if add_files.count() > 0 and add_files.is_visible():
                 try:
-                    add_files.click(timeout=3000)
-                except:
-                    add_files.evaluate("el => el.click()")
-                sb.page.wait_for_timeout(1000)
+                    with sb.page.expect_file_chooser(timeout=5000) as fc_info:
+                        add_files.click(timeout=3000)
+                    file_chooser = fc_info.value
+                    file_chooser.set_files(file_paths)
+                    print(f"        ✅ Uploaded {num_files} files via file chooser")
+                    upload_done = True
+                except Exception as chooser_err:
+                    print(f"        ⚠️ File chooser click failed: {chooser_err}. Trying input direct upload...")
 
+            # Try method 2: Direct upload using input[type='file'] if method 1 failed or wasn't applicable
+            if not upload_done:
                 file_input = modal.locator("input[type='file'], input#file-uploader-scope").first
                 if file_input.count() == 0:
                     file_input = sb.page.locator("input[type='file']").first
                 
                 if file_input.count() > 0:
-                    file_input.set_input_files(file_paths)
-                    print(f"        ✅ Uploaded {num_files} files")
-                    sb.page.wait_for_timeout(1500 + (num_files * 300))
+                    try:
+                        file_input.set_input_files(file_paths, timeout=5000)
+                        print(f"        ✅ Uploaded {num_files} files directly")
+                        upload_done = True
+                    except Exception as direct_err:
+                        print(f"        ❌ Direct upload failed: {direct_err}")
                 else:
                     print("        ⚠️ File input not found")
-                
-                if num_files > 1:
-                    view_more = modal.locator("text='View more', .view-more-btn").first
-                    if view_more.count() > 0 and view_more.is_visible():
-                        try:
-                            view_more.click(timeout=3000)
-                        except:
-                            view_more.evaluate("el => el.click()")
-                        sb.page.wait_for_timeout(1000)
-                        print("        ✅ Clicked View more")
-            else:
-                print("        ⚠️ 'Add files' button not found")
+                    
+            if upload_done and num_files > 1:
+                view_more = modal.locator("text='View more', .view-more-btn").first
+                if view_more.count() > 0 and view_more.is_visible():
+                    try:
+                        view_more.click(timeout=3000)
+                    except:
+                        view_more.evaluate("el => el.click()")
+                    sb.page.wait_for_timeout(1000)
+                    print("        ✅ Clicked View more")
+                    
+                showing = modal.locator("span.text-secondary", has_text="Showing").first
+                if showing.count() > 0:
+                    print(f"        ✅ Found text: {showing.inner_text()}")
+                else:
+                    print("        ⚠️ Showing X of X files text not found")
+
+            # Click Upload/Save confirmation inside modal if present
+            confirm_btn = modal.locator("button:has-text('Upload'), button:has-text('Save'), .modal-footer button.native-button").first
+            if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                try:
+                    confirm_btn.click(timeout=3000)
+                    sb.page.wait_for_timeout(1000)
+                except Exception:
+                    pass
 
             close_btn = modal.locator("#modal-generic-close, .btn-close, .modal-header .close").first
             if close_btn.count() == 0:
                 close_btn = sb.page.locator("#modal-generic-close, .btn-close, .modal-header .close").first
                 
-            if close_btn.count() > 0:
+            if close_btn.count() > 0 and close_btn.is_visible():
                 try:
                     close_btn.click(timeout=3000)
                 except:
@@ -933,11 +956,6 @@ class TestAssessmentTab:
             # Read from Summary table using native Playwright
             summary_vals = {"s1": 0.0, "s2": 0.0, "s3": 0.0, "total": 0.0}
             summary_table = sb.page.locator("table.summary-table").filter(has_text="Scope 1").filter(has_text="Scope 2").first
-            
-            # Print the entire HTML of the summary table to see what we are parsing
-            if summary_table.count() > 0:
-                print("DEBUG SUMMARY TABLE HTML:")
-                print(summary_table.inner_html())
             
             trs = summary_table.locator("tbody tr")
             for i in range(trs.count()):

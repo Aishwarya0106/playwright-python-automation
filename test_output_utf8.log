@@ -1,0 +1,235 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Promantus\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+metadata: {'Python': '3.13.5', 'Platform': 'Windows-11-10.0.26200-SP0', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'base-url': '2.1.0', 'html': '4.2.0', 'metadata': '3.1.1'}, 'Base URL': ''}
+rootdir: C:\Users\Promantus\OneDrive\Desktop\GNFZ_Automation
+configfile: pytest.ini
+testpaths: GNFZ_Tests
+plugins: base-url-2.1.0, html-4.2.0, metadata-3.1.1
+collecting ... collected 31 items
+
+GNFZ_Tests/01_login/test_login.py::TestSignUp::test_SU01_signup_without_any_data 
+
+Step 1: Navigating to https://dev-platform.globalnetworkforzero.com/login
+Step 2: Clicking Sign up link
+Sign Up page ready
+
+
+SU01: Sign Up without any data
+SU01 PASSED - ['First name is required', 'Email is required.', 'Password is required.', 'Confirm password is required.']
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignUp::test_SU02_signup_with_first_name_only 
+SU02: First Name only
+SU02 PASSED - ['Email is required.', 'Password is required.', 'Confirm password is required.']
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignUp::test_SU03_signup_with_first_last_email_only 
+SU03: First Name, Last Name, Email only
+SU03 PASSED - ['Password is required.', 'Confirm password is required.']
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignUp::test_SU04_signup_password_mismatch 
+SU04: Mismatched passwords
+SU04 PASSED - ['Password not match.']
+PASSED
+Step 4: Clicking Sign in link
+Step 5: Sign In page ready
+
+
+GNFZ_Tests/01_login/test_login.py::TestForgotPassword::test_FP01_reset_without_email 
+Step 6: Clicking Forgot password link
+Forgot Password page ready
+
+
+FP01: Reset without email
+FP01 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestForgotPassword::test_FP02_reset_with_invalid_email 
+FP02: Reset with invalid email
+FP02 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestForgotPassword::test_FP03_reset_with_valid_email 
+FP03: Reset with valid email aishwarya@promantus.com
+FP03 PASSED
+PASSED
+Step 7: Clicking Sign in link
+Step 8: Sign In page ready
+
+
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC01_login_without_email_and_password 
+Step 9: Sign In page active
+
+
+TC01: No credentials
+TC01 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC02_login_without_email_with_password 
+TC02: Password only
+TC02 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC03_login_with_email_without_password 
+TC03: Email only
+TC03 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC04_login_with_valid_email_wrong_password 
+TC04: Wrong password
+TC04 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC05_login_with_invalid_email_format 
+TC05: Invalid email format
+TC05 PASSED
+PASSED
+GNFZ_Tests/01_login/test_login.py::TestSignIn::test_TC06_login_with_valid_credentials 
+TC06: Valid credentials
+TC06 PASSED - Redirected to https://dev-platform.globalnetworkforzero.com/project/list
+PASSED
+Sign In tests done. Browser stays open for Create New Project.
+
+
+GNFZ_Tests/02_create_new_project/test_create_project.py::TestCreateNewProject::test_CNP01_verify_building_page_loaded 
+
+Step 11: Checking page after login...
+  Current URL: https://dev-platform.globalnetworkforzero.com/project/list
+  On project/list. Clicking Create new project...
+  Navigated to: https://dev-platform.globalnetworkforzero.com/project/menu
+  Waiting for category cards...
+  Found Building at position 1 of 14. Clicking...
+  Navigated to: https://dev-platform.globalnetworkforzero.com/project/building
+
+
+CNP01: Verify building page URL
+CNP01 PASSED - https://dev-platform.globalnetworkforzero.com/project/building
+PASSED
+GNFZ_Tests/02_create_new_project/test_create_project.py::TestCreateNewProject::test_CNP02_verify_breadcrumb 
+CNP02: Verify breadcrumb
+  Breadcrumb: ['Projects', 'Building', 'Create']
+CNP02 PASSED - Projects > Building > Create
+PASSED
+GNFZ_Tests/02_create_new_project/test_create_project.py::TestCreateNewProject::test_CNP03_verify_net_zero_certification_heading 
+CNP03: Verify Net Zero certification heading
+CNP03 PASSED - 'Net Zero certification'
+PASSED
+GNFZ_Tests/02_create_new_project/test_create_project.py::TestCreateNewProject::test_CNP04_verify_all_tabs_dynamically 
+CNP04: Reading all tabs dynamically...
+CNP04 PASSED - 8 tabs: ['Overview', 'Basic Info', 'Assessment', 'Net Zero Plan', 'Offset', 'Net Zero Milestone', 'Summary', 'Project Files']
+PASSED
+CNP tests done. Clicking Basic Info tab for next test file...
+Basic Info tab clicked and content loaded.
+
+
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI01_verify_building_info_heading 
+
+Basic Info Tab: Verifying content loaded...
+Basic Info content ready.
+
+
+BI01: Verify Building Info heading
+BI01 PASSED
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI02_verify_all_building_fields_dynamically 
+BI02: Verify all building info fields dynamically
+FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI03_verify_team_info_heading 
+BI03: Verify Team Info heading
+BI03 PASSED
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI04_verify_team_fields_dynamically 
+BI04: Verify Team Info fields dynamically
+FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI05_verify_billing_info 
+BI05: Verify Billing Info
+BI05 PASSED
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI06_save_without_data_verify_title_error FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI07_fill_building_space_title 
+BI07: Fill title = 'Building - Apr 22'
+BI07 PASSED - 'Building - Apr 22'
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI08_select_occupancy_categories 
+BI08: Select occupancy categories and click outside
+FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI09_fill_gross_building_area 
+BI09: Fill Gross building area = 100
+BI09 PASSED - Gross area = 100
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI10_fill_target_1000_check_error_then_fix_to_100 FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI11_fill_geo_location_via_icon FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI12_fill_start_date_today 
+BI12: Fill Start date = 04/22/2026
+  Start date value: ''
+BI12 PASSED - 04/22/2026
+PASSED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI13_save_and_check_building_space_id FAILED
+GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI14_click_building_breadcrumb_check_project_in_list FAILED
+
+=== Report saved: C:\Users\Promantus\OneDrive\Desktop\GNFZ_Automation\GNFZ_Tests\reports\report.html ===
+
+
+All tests complete. Browser closed.
+
+
+================================== FAILURES ===================================
+______ TestBasicInfoTab.test_BI02_verify_all_building_fields_dynamically ______
+GNFZ_Tests\03_tabs\test_01_basic_info.py:114: in test_BI02_verify_all_building_fields_dynamically
+    print(f"  \u2705 {label}")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+__________ TestBasicInfoTab.test_BI04_verify_team_fields_dynamically __________
+GNFZ_Tests\03_tabs\test_01_basic_info.py:150: in test_BI04_verify_team_fields_dynamically
+    print(f"  \u2705 {label}")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+_______ TestBasicInfoTab.test_BI06_save_without_data_verify_title_error _______
+GNFZ_Tests\03_tabs\test_01_basic_info.py:178: in test_BI06_save_without_data_verify_title_error
+    print("\\nBI06: Scroll \u2192 Save (no data) \u2192 Check title error")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 15: character maps to <undefined>
+___________ TestBasicInfoTab.test_BI08_select_occupancy_categories ____________
+GNFZ_Tests\03_tabs\test_01_basic_info.py:247: in test_BI08_select_occupancy_categories
+    print(f"  \u2705 Added as custom tag: '{category}'")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+___ TestBasicInfoTab.test_BI10_fill_target_1000_check_error_then_fix_to_100 ___
+GNFZ_Tests\03_tabs\test_01_basic_info.py:285: in test_BI10_fill_target_1000_check_error_then_fix_to_100
+    print("\\nBI10: Target area 1000 \u2192 check error \u2192 fix to 100")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 25: character maps to <undefined>
+____________ TestBasicInfoTab.test_BI11_fill_geo_location_via_icon ____________
+GNFZ_Tests\03_tabs\test_01_basic_info.py:344: in test_BI11_fill_geo_location_via_icon
+    print("\\nBI11: Click geo icon \u2192 open modal \u2192 search IITM Research Park \u2192 submit")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 23: character maps to <undefined>
+_________ TestBasicInfoTab.test_BI13_save_and_check_building_space_id _________
+GNFZ_Tests\03_tabs\test_01_basic_info.py:439: in test_BI13_save_and_check_building_space_id
+    print("\\nBI13: Click Save \u2192 Check Building/Space id")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 19: character maps to <undefined>
+_ TestBasicInfoTab.test_BI14_click_building_breadcrumb_check_project_in_list __
+GNFZ_Tests\03_tabs\test_01_basic_info.py:497: in test_BI14_click_building_breadcrumb_check_project_in_list
+    print(f"\\nBI14: Click Building breadcrumb \u2192 check '{project_name}' in list")
+..\..\..\AppData\Local\Programs\Python\Python313\Lib\encodings\cp1252.py:19: in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 34: character maps to <undefined>
+=========================== short test summary info ===========================
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI02_verify_all_building_fields_dynamically - UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI04_verify_team_fields_dynamically - UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI06_save_without_data_verify_title_error - UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 15: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI08_select_occupancy_categories - UnicodeEncodeError: 'charmap' codec can't encode character '\u2705' in position 2: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI10_fill_target_1000_check_error_then_fix_to_100 - UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 25: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI11_fill_geo_location_via_icon - UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 23: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI13_save_and_check_building_space_id - UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 19: character maps to <undefined>
+FAILED GNFZ_Tests/03_tabs/test_01_basic_info.py::TestBasicInfoTab::test_BI14_click_building_breadcrumb_check_project_in_list - UnicodeEncodeError: 'charmap' codec can't encode character '\u2192' in position 34: character maps to <undefined>
+================== 8 failed, 23 passed in 223.28s (0:03:43) ===================

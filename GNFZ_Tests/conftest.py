@@ -15,9 +15,11 @@ def start_shared_browser():
     if getattr(sb, "pw", None) is None:
         sb.pw = sync_playwright().start()
     if getattr(sb, "browser", None) is None:
+        slow_mo_val = int(os.environ.get("SLOW_MO", "800"))
+        headless_val = os.environ.get("HEADLESS", "False").lower() == "true"
         sb.browser = sb.pw.chromium.launch(
-            headless=False,
-            slow_mo=800,
+            headless=headless_val,
+            slow_mo=slow_mo_val,
             args=["--start-maximized"]
         )
     if getattr(sb, "context", None) is None:

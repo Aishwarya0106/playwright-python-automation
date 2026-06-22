@@ -5,3 +5,4 @@ pw      = None
 browser = None
 context = None
 page    = None
+project_type = "building"

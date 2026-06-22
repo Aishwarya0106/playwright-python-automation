@@ -35,8 +35,10 @@ class TestCreateNewProject:
         print(f"  Current URL: {current_url}")
 
         # ── Already on project/building — nothing to do ───────────────────────
-        if PROJECT_BUILDING_URL in current_url:
-            print("  Already on project/building. Continuing...")
+        target_type = getattr(sb, "project_type", "building").lower()
+        # ── Already on project/building or project/portfolio — nothing to do ───────────────────────
+        if f"project/{target_type}" in current_url:
+            print(f"  Already on project/{target_type}. Continuing...")
             return
 
         # ── Must be on project/list — click Create new project ────────────────
@@ -54,35 +56,40 @@ class TestCreateNewProject:
             print(f"  Unexpected URL: {current_url}")
             raise AssertionError(f"Expected project/list URL but got: {current_url}")
 
-        # ── Find Building card dynamically and click ──────────────────────────
-        print("  Waiting for category cards...")
+        # ── Find target card dynamically and click ──────────────────────────
+        print(f"  Waiting for category cards (Target: '{target_type}')...")
         sb.page.wait_for_selector(CATEGORY_CARDS, timeout=15_000)
         sb.page.wait_for_timeout(500)
 
         all_cards      = sb.page.locator(CATEGORY_CARDS)
         total          = all_cards.count()
-        building_index = None
+        target_index = None
 
         for i in range(total):
             name = all_cards.nth(i).inner_text().strip()
-            if name.lower() == "building":
-                building_index = i
+            if name.lower() == target_type:
+                target_index = i
                 break
 
-        if building_index is None:
-            raise AssertionError("Building card not found on project/menu page")
+        if target_index is None:
+            raise AssertionError(f"'{target_type}' card not found on project/menu page")
 
-        print(f"  Found Building at position {building_index + 1} of {total}. Clicking...")
-        building_card = all_cards.nth(building_index)
-        building_card.scroll_into_view_if_needed()
+        print(f"  Found {target_type} at position {target_index + 1} of {total}. Clicking...")
+        target_card = all_cards.nth(target_index)
+        target_card.scroll_into_view_if_needed()
         sb.page.wait_for_timeout(300)
-        building_card.click()
+        target_card.click()
         sb.page.wait_for_timeout(PAUSE * 2)
         print(f"  Navigated to: {sb.page.url}\n")
 
     @classmethod
     def teardown_class(cls):
-        """CNP tests done. Click Basic Info tab so test_02_basic_info.py continues."""
+        """CNP tests done. If project type is building, click Basic Info tab so test_01_basic_info.py continues."""
+        target_type = getattr(sb, "project_type", "building").lower()
+        if target_type != "building":
+            print(f"\nCNP tests done. Skip teardown click since project type is: {target_type}\n")
+            return
+            
         print("\nCNP tests done. Clicking Basic Info tab for next test file...")
         try:
             tab = sb.page.locator(BASIC_INFO_TAB)
@@ -97,24 +104,27 @@ class TestCreateNewProject:
             print(f"Could not click Basic Info tab: {e}")
 
     def test_CNP01_verify_building_page_loaded(self):
-        """CNP01 - Verify URL is project/building"""
+        """CNP01 - Verify URL contains project type"""
         start = datetime.datetime.now()
-        print("\nCNP01: Verify building page URL")
+        target_type = getattr(sb, "project_type", "building").lower()
+        expected_url = f"project/{target_type}"
+        print(f"\nCNP01: Verify page URL contains '{expected_url}'")
         try:
             current_url = sb.page.url
-            assert PROJECT_BUILDING_URL in current_url, \
-                f"Expected '{PROJECT_BUILDING_URL}' but got: {current_url}"
+            assert expected_url in current_url, \
+                f"Expected '{expected_url}' but got: {current_url}"
             sb.page.wait_for_timeout(PAUSE)
-            ru.add_result("Create New Project", f"CNP01 - Building page loaded: {current_url}", start, "PASSED")
+            ru.add_result("Create New Project", f"CNP01 - {target_type} page loaded: {current_url}", start, "PASSED")
             print(f"CNP01 PASSED - {current_url}")
         except Exception as e:
-            ru.add_result("Create New Project", "CNP01 - Building page loaded", start, "FAILED", str(e))
+            ru.add_result("Create New Project", f"CNP01 - {target_type} page loaded", start, "FAILED", str(e))
             raise
 
     def test_CNP02_verify_breadcrumb(self):
-        """CNP02 - Dynamically verify breadcrumb contains Building"""
+        """CNP02 - Dynamically verify breadcrumbs for the selected project type"""
         start = datetime.datetime.now()
-        print("\nCNP02: Verify breadcrumb")
+        target_type = getattr(sb, "project_type", "building").lower()
+        print(f"\nCNP02: Verify breadcrumb for '{target_type}'")
         try:
             sb.page.wait_for_selector(BREADCRUMB_ITEMS, timeout=15_000)
             crumbs     = sb.page.locator(BREADCRUMB_ITEMS)
@@ -122,9 +132,20 @@ class TestCreateNewProject:
                           for i in range(crumbs.count())
                           if crumbs.nth(i).inner_text().strip()]
             print(f"  Breadcrumb: {crumb_list}")
-            assert len(crumb_list) >= 2, f"Expected at least 2 items: {crumb_list}"
-            assert "building" in " ".join(crumb_list).lower(), \
-                f"'Building' not in breadcrumb: {crumb_list}"
+            
+            if target_type == "portfolio":
+                # Specifically verify "Projects/Portfolio/Create" for portfolio
+                normalized_crumbs = [c.lower() for c in crumb_list]
+                assert normalized_crumbs == ["projects", "portfolio", "create"], \
+                    f"Expected breadcrumbs ['Projects', 'Portfolio', 'Create'] but got {crumb_list}"
+                print("  ✅ Breadcrumbs match Projects/Portfolio/Create")
+            else:
+                # Default dynamic verification for building
+                assert len(crumb_list) >= 2, f"Expected at least 2 items: {crumb_list}"
+                assert target_type in " ".join(crumb_list).lower(), \
+                    f"'{target_type}' not in breadcrumb: {crumb_list}"
+                print(f"  ✅ Breadcrumbs contain '{target_type}'")
+                
             sb.page.wait_for_timeout(PAUSE)
             ru.add_result("Create New Project", f"CNP02 - Breadcrumb: {' > '.join(crumb_list)}", start, "PASSED")
             print(f"CNP02 PASSED - {' > '.join(crumb_list)}")
@@ -133,7 +154,7 @@ class TestCreateNewProject:
             raise
 
     def test_CNP03_verify_net_zero_certification_heading(self):
-        """CNP03 - Verify Net Zero certification heading is visible"""
+        """CNP03 - Verify Net Zero certification heading is visible and text is present"""
         start = datetime.datetime.now()
         print("\nCNP03: Verify Net Zero certification heading")
         try:
@@ -147,6 +168,9 @@ class TestCreateNewProject:
                         found_text = text
                         break
             assert found_text is not None, "Net Zero certification heading not found"
+            assert "net zero certification" in found_text.lower(), \
+                f"Expected 'Net Zero certification' in heading but got '{found_text}'"
+            
             sb.page.wait_for_timeout(PAUSE)
             ru.add_result("Create New Project", f"CNP03 - Heading: '{found_text}'", start, "PASSED")
             print(f"CNP03 PASSED - '{found_text}'")

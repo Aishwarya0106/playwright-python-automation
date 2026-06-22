@@ -7,6 +7,7 @@ import datetime
 import report_utils as ru
 import shared_browser as sb
 from playwright.sync_api import expect
+from pages import ui_utils as uu
 
 # ── Locators ──────────────────────────────────────────────────────────────────
 BUILDING_INFO_HEADING = "b:has-text('Building Info')"
@@ -471,6 +472,17 @@ class TestBasicInfoTab:
         print(f"\nBI14: Breadcrumb → verify project → open it")
         print(f"  Name: '{project_name}'  ID: '{building_id}'")
         try:
+            # ── Step 0: Wait for breadcrumbs container to be visible ──
+            print("  Waiting for breadcrumbs container to be visible...")
+            try:
+                sb.page.wait_for_selector(
+                    "nav ol.breadcrumb, ol.breadcrumb, nav.breadcrumb, [class*='breadcrumb'], .breadcrumbs",
+                    state="visible",
+                    timeout=10000
+                )
+            except Exception as e:
+                print(f"  Warning waiting for breadcrumbs: {e}")
+
             # ── Step 1: Click Building in breadcrumb via JS ────────────────────
             print("  Step 1: Clicking Building breadcrumb via JS...")
             clicked = sb.page.evaluate("""
@@ -493,7 +505,7 @@ class TestBasicInfoTab:
                             }
                         }
                     }
-                    // Last resort: any <a> whose text is exactly "Building"
+                    // Last resort: any <a> whose text is exactly "Building" or "Projects"
                     var links = document.querySelectorAll('a');
                     for (var i = 0; i < links.length; i++) {
                         var t = links[i].innerText.trim().toLowerCase();
@@ -508,7 +520,7 @@ class TestBasicInfoTab:
             if clicked == 'NOT FOUND':
                 print("  Fallback to Playwright click...")
                 try:
-                    sb.page.locator("a:has-text('Building'), a:has-text('Buildings'), li.breadcrumb-item:has-text('Building')").first.click(timeout=5000)
+                    sb.page.locator("a:has-text('Projects'), a:has-text('projects'), a:has-text('Building'), a:has-text('Buildings'), li.breadcrumb-item:has-text('Building'), li.breadcrumb-item:has-text('Projects')").first.click(timeout=5000)
                     clicked = "clicked via playwright fallback"
                 except Exception as e:
                     print(f"  Playwright click failed: {e}")
@@ -527,6 +539,13 @@ class TestBasicInfoTab:
             )
             sb.page.wait_for_timeout(PAUSE)
             print("  ✅ On project list")
+
+            # Wait for target project row to be visible in the list to bypass loading states
+            target_row_locator = sb.page.locator(f"{PROJECT_TABLE_ROWS}:has-text('{project_name}')").first
+            try:
+                target_row_locator.wait_for(state="visible", timeout=15_000)
+            except Exception as e:
+                print(f"  Warning: Target row for '{project_name}' not visible: {e}")
 
             # ── Step 3: Find project row by name ──────────────────────────────
             print(f"  Step 3: Looking for '{project_name}'...")
@@ -552,10 +571,47 @@ class TestBasicInfoTab:
                 else:
                     print(f"  ℹ️  Building ID '{id_num}' not in row text")
 
+            # ── Step 6: Click the project to reopen it ──
+            print(f"  Step 6: Clicking project row to reopen it...")
+            project_link = rows.nth(found_idx).locator("a").first
+            if project_link.count() == 0:
+                project_link = rows.nth(found_idx).locator(f"td:has-text('{project_name}')").first
+            if project_link.count() == 0:
+                project_link = rows.nth(found_idx)
+                
+            try:
+                uu.safe_click(sb.page, project_link, wait_after=2000)
+            except Exception as e:
+                print(f"  Click failed: {e}. Trying JS click...")
+                try:
+                    project_link.evaluate("el => el.click()")
+                    sb.page.wait_for_timeout(2000)
+                except Exception as e2:
+                    print(f"  JS click failed: {e2}. Trying JS click on row...")
+                    rows.nth(found_idx).evaluate("el => el.click()")
+                    sb.page.wait_for_timeout(2000)
+
+            # Wait for project page loading
+            try:
+                sb.page.wait_for_selector(BUILDING_INFO_HEADING, timeout=15_000)
+                print("  ✅ Project reopened, tabs visible.")
+            except Exception as wait_err:
+                print(f"  Warning: BUILDING_INFO_HEADING not visible: {wait_err}. URL is {sb.page.url}")
+                if "project/building" in sb.page.url:
+                    print("  URL matches project/building. Attempting to click Basic Info tab manually...")
+                    try:
+                        sb.page.locator("#gnfz-basicInfo label").first.click()
+                        sb.page.wait_for_selector(BUILDING_INFO_HEADING, timeout=10_000)
+                        print("  ✅ Re-selected Basic Info tab manually.")
+                    except Exception as click_err:
+                        raise AssertionError(f"Re-opened project page but failed to load Basic Info: {click_err}")
+                else:
+                    raise wait_err
+
             ru.add_result("Basic Info",
-                          f"BI14 - Project '{project_name}' found in list",
+                          f"BI14 - Project '{project_name}' found and reopened",
                           start, "PASSED")
-            print("BI14 PASSED - Verified project in list, not clicking it.")
+            print("BI14 PASSED - Project reopened.")
 
         except Exception as e:
             ru.add_result("Basic Info",

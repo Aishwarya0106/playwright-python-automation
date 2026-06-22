@@ -1,31 +1,28 @@
 import sys, os
 import datetime
 import pytest
-
 _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 for _p in [_root, os.path.join(_root, "GNFZ_Tests")]:
     if _p not in sys.path: sys.path.insert(0, _p)
-
 import report_utils as ru
 import shared_browser as sb
 from pages.project_files_page import ProjectFilesPage
+from pages.overview_page import OverviewPage
 from pages import ui_utils as uu
-
 class TestProjectFilesTab:
-
     page_obj = None
-
     @classmethod
     def setup_class(cls):
         print("\n\nProject Files: Clicking Project Files tab from main menu...")
         cls.page_obj = ProjectFilesPage()
         cls.page_obj.navigate_to_project_files()
         print("Project Files tab ready.\n")
-
     @classmethod
     def teardown_class(cls):
-        print("\nProject Files tests done. Browser stays open.\n")
-
+        print("\nProject Files tests done. Navigating to Overview tab...\n")
+        overview_obj = OverviewPage()
+        overview_obj.navigate_to_overview()
+        print("Overview tab is now active.\n")
     def test_PF01_verify_building_info_folders_and_upload(self):
         """PF01 - Start from Building Info, check nested folders, upload files, check count"""
         start = datetime.datetime.now()
@@ -83,26 +80,28 @@ class TestProjectFilesTab:
         except Exception as e:
             ru.add_result("Project Files", "PF01 - Building Info Upload", start, "FAILED", str(e))
             raise
-
     def _traverse_and_verify_folders(self, current_breadcrumb_level=None):
         """Recursively traverses all folders visible on the screen."""
         folders = self.page_obj.get_all_nested_folders()
         if not folders:
             # We reached the deepest level (no subfolders)
             return 1
-
         total_files = 0
         import re
         
         # Remove duplicates to avoid checking each category twice
         unique_folders = list(dict.fromkeys(folders))
-
         for folder in unique_folders:
+            # Avoid infinite recursion due to slow page loading race conditions
+            current_path = self.page_obj.get_breadcrumb_path()
+            if current_path and folder in current_path:
+                print(f"     ℹ️ Already inside '{folder}' (detected via breadcrumbs: {current_path}). Skipping duplicate traversal.")
+                continue
+
             # 1. Get outer count
             outer_count_str = self.page_obj.get_folder_item_count(folder)
             m = re.search(r'\d+', outer_count_str)
             outer_count = int(m.group()) if m else 0
-
             # 2. Open folder
             print(f"  -> Entering {folder}")
             opened = self.page_obj.open_folder(folder)
@@ -121,10 +120,12 @@ class TestProjectFilesTab:
             inner_item_count = self.page_obj.get_total_item_count()
             
             # Print exact requested message
+            # Print exact requested message and assert
             if inner_item_count == outer_count:
                 print(f"     ✅ item inside folder is {inner_item_count} and item count is outside is {outer_count} both are same check")
             else:
-                print(f"     ⚠️ Mismatch: item inside folder is {inner_item_count} and item count is outside is {outer_count}")
+                mismatch_msg = f"Mismatch: item inside folder is {inner_item_count} and item count is outside is {outer_count}"
+                print(f"     ⚠️ WARNING: {mismatch_msg}")
                 
             # Verify uploaded files are present in the folder for categories
             inner_count = self.page_obj.get_file_count()
@@ -156,16 +157,12 @@ class TestProjectFilesTab:
                     else:
                         print(f"     ⚠️ Critical: Could not navigate back to '{current_breadcrumb_level}'.")
             else:
-                # If no explicit level, click the first breadcrumb to go to root
-                first_crumb = sb.page.locator(".breadcrumb li, .breadcrumbs span, .breadcrumb-item").first
-                if first_crumb.count() > 0:
-                    uu.safe_click(sb.page, first_crumb, wait_after=1000)
-                else:
-                    self.page_obj.go_back_to_root()
+                # If no explicit level, we should go back to the tab root. 
+                # Avoid clicking the very first breadcrumb on the page, as it usually leads to 'List of Projects'.
+                self.page_obj.go_back_to_root()
             sb.page.wait_for_timeout(1000)
         
         return total_files
-
     @pytest.mark.parametrize("tab_name", [
         "Assessment",
         "Net Zero Plan",

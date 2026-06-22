@@ -97,7 +97,7 @@ class OffsetPage:
                 file_input.set_input_files(fpath)
                 self.page.wait_for_timeout(1500)
                 
-                upload_btn = self.page.locator("button:has-text('Upload')").filter(has_text="Upload")
+                upload_btn = self.page.locator("button:has-text('Upload'):visible, .modal.show button:has-text('Upload')").first
                 if upload_btn.count() > 0:
                     uu.safe_click(self.page, upload_btn, wait_after=1000)
                     
@@ -107,7 +107,7 @@ class OffsetPage:
     def click_save(self):
         btn = self.page.locator("gnfz-offset-tab #gnfz-save").first
         if btn.count() == 0:
-            btn = self.page.locator("#gnfz-save").filter(state="visible").first
+            btn = self.page.locator("#gnfz-save").locator("visible=true").first
             
         if btn.count() > 0:
             uu.safe_click(self.page, btn, force=True, wait_after=200)

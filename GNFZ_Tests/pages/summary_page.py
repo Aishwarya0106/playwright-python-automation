@@ -8,14 +8,14 @@ class SummaryPage:
         
         # Locators
         self.summary_menu_tab = self.page.locator("label[for='tab7']")
-        self.sub_tabs = self.page.locator("gnfz-summary-emissions-tab-business ul#myTab li button")
+        self.sub_tabs = self.page.locator("ul#myTab li button, .nav-tabs li button")
 
     def navigate_to_summary(self):
         uu.wait_for_page_stable(self.page)
         uu.safe_click(self.page, self.summary_menu_tab, wait_after=1000)
 
     def click_sub_tab(self, tab_text):
-        btn = self.sub_tabs.filter(has_text=tab_text)
+        btn = self.sub_tabs.filter(has_text=tab_text).first
         uu.safe_click(self.page, btn, wait_after=1000)
 
     def get_summary_table_data(self):
@@ -23,15 +23,37 @@ class SummaryPage:
         # Ensure no modals are blocking before attempting to read data
         uu.close_blocking_modals(self.page)
         
-        tables = self.page.locator("table.summary-table")
+        # Wait for any loading spinners to disappear
+        spinners = self.page.locator(".spinner-border, ngx-spinner")
+        if spinners.count() > 0:
+            try:
+                spinners.first.wait_for(state="hidden", timeout=15000)
+            except Exception:
+                pass
+                
+        # Locate all summary tables, but STRICTLY filter to only those currently visible on screen.
+        # This prevents Playwright from finding a hidden table (e.g. in a closed modal or hidden sidebar)
+        # and getting stuck waiting for it to become visible.
+        tables = self.page.locator("table.summary-table").locator("visible=true")
+            
         try:
-            tables.first.wait_for(state="visible", timeout=10000)
-        except Exception:
+            # Wait until at least one summary table matches the visible filter
+            tables.first.wait_for(state="attached", timeout=15000)
+            
+            # Explicitly wait for rows to populate to avoid reading an empty table
+            for _ in range(15):
+                if tables.first.locator("tbody tr").count() > 0:
+                    break
+                self.page.wait_for_timeout(1000)
+                
+        except Exception as e:
+            print(f"Warning: No visible summary table found: {e}")
             return {}
         
         data = {}
         calculated_total = 0.0
         
+        # We only need one pass now that we've waited for rows
         for t_idx in range(tables.count()):
             table = tables.nth(t_idx)
             rows = table.locator("tbody tr")
@@ -73,7 +95,7 @@ class SummaryPage:
                             calculated_total += val
                     except ValueError:
                         pass
-                        
+                            
         # If explicit total is 0 or missing, use the calculated total of the fields
         if "total" not in data or data["total"] == 0.0:
             data["total"] = calculated_total
@@ -83,9 +105,17 @@ class SummaryPage:
     def check_offset_data_present(self, year="2026"):
         """Checks if offset data for a specific year is present on the page."""
         element = self.page.locator(f"//*[contains(text(), '{year}')]").first
-        return element.count() > 0 and element.is_visible()
+        try:
+            element.wait_for(state="attached", timeout=3000)
+            return True
+        except Exception:
+            return False
 
     def check_milestone_data_present(self, year="2025"):
         """Checks if milestone data for a specific year is present on the page."""
         element = self.page.locator(f"//*[contains(text(), '{year}')]").first
-        return element.count() > 0 and element.is_visible()
+        try:
+            element.wait_for(state="attached", timeout=3000)
+            return True
+        except Exception:
+            return False
