@@ -26,6 +26,17 @@ def write_report():
     if _start is None:
         _start = datetime.datetime.now()
 
+    is_jenkins = "JENKINS_URL" in os.environ or "BUILD_NUMBER" in os.environ
+    timestamp_str = _start.strftime("%Y%m%d_%H%M%S")
+    if is_jenkins:
+        build_num = os.environ.get("BUILD_NUMBER", "")
+        build_suffix = f"_build{build_num}" if build_num else ""
+        report_name = f"jenkins_report{build_suffix}_{timestamp_str}.html"
+        report_title = "GNFZ Jenkins Automation Report"
+    else:
+        report_name = f"report_{timestamp_str}.html"
+        report_title = "GNFZ Automation Report"
+
     end_time  = datetime.datetime.now()
     duration  = str(end_time - _start).split(".")[0]
     total     = len(_results)
@@ -129,12 +140,24 @@ tr.err-row pre { font-size:12px; color:#c94b4b; padding:12px 18px; white-space:p
 </body>
 </html>"""
 
-    # Save to GNFZ_Tests/reports/report.html
+    # Dynamic title replacements
+    html = html.replace("<title>GNFZ Automation Report</title>", f"<title>{report_title}</title>")
+    html = html.replace("<h1>GNFZ Automation Report</h1>", f"<h1>{report_title}</h1>")
+
+    # Save to timestamped report path
     this_dir    = os.path.dirname(os.path.abspath(__file__))
-    report_path = os.path.join(this_dir, "reports", "report.html")
+    report_path = os.path.join(this_dir, "reports", report_name)
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(html)
 
-    print(f"\n\n=== Report saved: {report_path} ===\n")
+    print(f"\n\n=== Report saved: {report_path} ===")
+
+    # Also save a static copy representing the latest run
+    latest_name = "jenkins_report.html" if is_jenkins else "report.html"
+    latest_path = os.path.join(this_dir, "reports", latest_name)
+    with open(latest_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+    print(f"=== Latest report updated: {latest_path} ===\n")

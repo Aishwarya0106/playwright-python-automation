@@ -1,0 +1,5 @@
+pytest>=9.0.2
+playwright>=1.40.0
+pytest-html>=4.2.0
+pytest-base-url>=2.1.0
+pytest-metadata>=3.1.1

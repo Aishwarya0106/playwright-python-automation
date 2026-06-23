@@ -472,61 +472,11 @@ class TestBasicInfoTab:
         print(f"\nBI14: Breadcrumb → verify project → open it")
         print(f"  Name: '{project_name}'  ID: '{building_id}'")
         try:
-            # ── Step 0: Wait for breadcrumbs container to be visible ──
-            print("  Waiting for breadcrumbs container to be visible...")
-            try:
-                sb.page.wait_for_selector(
-                    "nav ol.breadcrumb, ol.breadcrumb, nav.breadcrumb, [class*='breadcrumb'], .breadcrumbs",
-                    state="visible",
-                    timeout=10000
-                )
-            except Exception as e:
-                print(f"  Warning waiting for breadcrumbs: {e}")
-
-            # ── Step 1: Click Building in breadcrumb via JS ────────────────────
-            print("  Step 1: Clicking Building breadcrumb via JS...")
-            clicked = sb.page.evaluate("""
-                (function() {
-                    // Try every breadcrumb container
-                    var containers = [
-                        document.querySelector('nav ol.breadcrumb'),
-                        document.querySelector('ol.breadcrumb'),
-                        document.querySelector('nav.breadcrumb'),
-                        document.querySelector('[class*="breadcrumb"]')
-                    ];
-                    for (var c = 0; c < containers.length; c++) {
-                        if (!containers[c]) continue;
-                        var items = containers[c].querySelectorAll('a, li, span');
-                        for (var i = 0; i < items.length; i++) {
-                            var t = (items[i].innerText || items[i].textContent || '').trim().toLowerCase();
-                            if (t === 'building' || t === 'buildings' || t === 'projects') {
-                                items[i].click();
-                                return 'clicked: ' + t + ' in ' + containers[c].tagName;
-                            }
-                        }
-                    }
-                    // Last resort: any <a> whose text is exactly "Building" or "Projects"
-                    var links = document.querySelectorAll('a');
-                    for (var i = 0; i < links.length; i++) {
-                        var t = links[i].innerText.trim().toLowerCase();
-                        if (t === 'building' || t === 'buildings' || t === 'projects') {
-                            links[i].click();
-                            return 'clicked link: ' + t;
-                        }
-                    }
-                    return 'NOT FOUND';
-                })()
-            """)
-            if clicked == 'NOT FOUND':
-                print("  Fallback to Playwright click...")
-                try:
-                    sb.page.locator("a:has-text('Projects'), a:has-text('projects'), a:has-text('Building'), a:has-text('Buildings'), li.breadcrumb-item:has-text('Building'), li.breadcrumb-item:has-text('Projects')").first.click(timeout=5000)
-                    clicked = "clicked via playwright fallback"
-                except Exception as e:
-                    print(f"  Playwright click failed: {e}")
-                    
-            print(f"  Breadcrumb JS result: {clicked}")
-            assert "NOT FOUND" not in clicked, "Building breadcrumb not found in DOM"
+            # ── Step 1: Click Projects breadcrumb ────────────────────
+            print("  Step 1: Clicking Projects breadcrumb...")
+            projects_breadcrumb = sb.page.locator("a:text-is('Projects'), a:text-is('projects'), a:has-text('Projects')").first
+            projects_breadcrumb.wait_for(state="visible", timeout=15000)
+            projects_breadcrumb.click()
             sb.page.wait_for_timeout(PAUSE * 2)
             print(f"  URL: {sb.page.url}")
 

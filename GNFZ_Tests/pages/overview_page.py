@@ -13,7 +13,7 @@ class OverviewPage:
         self.team_info_select = self.page.locator("select#gnfz-team-info, select[id*='team-info']").first
         self.complete_assessment_select = self.page.locator("select#gnfz-complete-assessment, select[id*='complete-assessment']").first
         self.net_zero_plans_select = self.page.locator("select#gnfz-nzp, select[id*='nzp']").first
-        self.error_message = self.page.locator(".text-danger.text-left.text-size-14px, .text-danger, #error-message").first
+        self.error_message = self.page.locator("small.text-danger, .text-danger, .invalid-feedback, .alert-danger, .swal2-html-container, .swal2-title, .toast-body, #error-message").first
 
     def navigate_to_overview(self):
         print("Navigating to Overview tab...")
@@ -155,7 +155,19 @@ class OverviewPage:
     def submit_assessment_for_review(self):
         uu.sc(self.complete_assessment_select)
         self.complete_assessment_select.select_option(label="Submit for review")
-        self.page.wait_for_timeout(500)
+        self.page.wait_for_timeout(1000)
+        
+        # Click YES on the confirmation popup if it appears
+        yes_btn = self.page.locator("button#simple-process-status-submit-change-event-popup, button:has-text('YES')").first
+        try:
+            if yes_btn.count() > 0:
+                yes_btn.wait_for(state="visible", timeout=3000)
+                uu.safe_click(self.page, yes_btn, wait_after=2000)
+        except Exception as e:
+            print(f"  Warning: Click YES on confirmation failed: {e}")
+            
+        uu.wait_for_page_stable(self.page)
+        self.page.wait_for_timeout(1000)
 
     def get_error_message(self):
         try:
