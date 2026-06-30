@@ -1,17 +1,5 @@
 import sys
 import os
-import io
-
-# Reconfigure stdout/stderr to use UTF-8 and avoid UnicodeEncodeError on Windows/Jenkins
-if sys.platform.startswith("win"):
-    for stream_name in ("stdout", "stderr", "__stdout__", "__stderr__"):
-        stream = getattr(sys, stream_name, None)
-        if stream and hasattr(stream, "reconfigure"):
-            try:
-                stream.reconfigure(encoding="utf-8", errors="replace")
-            except Exception:
-                pass
-
 
 # Add GNFZ_AUTOMATION root to sys.path
 # This makes shared_browser.py and report_utils.py importable everywhere

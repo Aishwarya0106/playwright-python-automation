@@ -51,9 +51,9 @@ class TestOverviewTab:
             
             # 4. Change status of all dropdowns to 'Completed'
             first_label = "Building Info"
-            if sb.page.locator(".text-label:has-text('Asset Info'), label:has-text('Asset Info'), .form-label:has-text('Asset Info'), :text('Asset Info')").first.is_visible():
+            if sb.page.locator(".text-label:has-text('Asset Info'), label:has-text('Asset Info'), .form-label:has-text('Asset Info'), text='Asset Info'").first.is_visible():
                 first_label = "Asset Info"
-            elif sb.page.locator(".text-label:has-text('Basic Info'), label:has-text('Basic Info'), .form-label:has-text('Basic Info'), :text('Basic Info')").first.is_visible():
+            elif sb.page.locator(".text-label:has-text('Basic Info'), label:has-text('Basic Info'), .form-label:has-text('Basic Info'), text='Basic Info'").first.is_visible():
                 first_label = "Basic Info"
 
             dropdowns = [
