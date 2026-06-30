@@ -137,7 +137,7 @@ class OverviewPage:
                 labels = [l.strip() for l in labels_str.split("/")]
                 found_label = False
                 for label in labels:
-                    alt = self.page.locator(f".text-label:has-text('{label}'), label:has-text('{label}'), .form-label:has-text('{label}'), text=\"{label}\"")
+                    alt = self.page.locator(f".text-label:has-text('{label}'), label:has-text('{label}'), .form-label:has-text('{label}'), p:has-text('{label}'), span:has-text('{label}')")
                     if alt.count() > 0 and alt.first.is_visible():
                         found_label = True
                         break

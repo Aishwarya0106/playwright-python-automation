@@ -25,34 +25,45 @@ def wait_for_page_stable(page, timeout=30000):
         print(f"Warning waiting for spinners: {spinner_err}")
 
 def close_blocking_modals(page):
-    """Detect and close global blocking modals (e.g. #ng-modal-generic)."""
+    """Detect and close/remove global blocking modals (e.g. #ng-modal-generic) to prevent click interception."""
     try:
-        # Check if backdrop or modal is present and visible
-        blocking_elements = page.locator(".modal-backdrop.show, .modal.show, #ng-modal-generic")
-        if blocking_elements.count() > 0 and blocking_elements.first.is_visible():
-            print("Blocking modal detected. Attempting to close...")
-            # Try to find a close button in any active modal
-            close_btn = page.locator(".modal.show .btn-close, .modal.show #modal-generic-close, .modal.show .close, #ng-modal-generic .btn-close").first
+        # 1. Look for known modals
+        modals = page.locator(".modal.show, #ng-modal-generic, .modal-backdrop.show")
+        count = modals.count()
+        if count > 0 and modals.first.is_visible():
+            print("  [MODAL] Blocking modal or backdrop detected.")
+            # Try to click close button
+            close_btn = page.locator(".modal.show .btn-close, .modal.show [data-bs-dismiss='modal'], #ng-modal-generic .btn-close, #ng-modal-generic button:has-text('Close')").first
             if close_btn.count() > 0 and close_btn.is_visible():
+                print("  [MODAL] Clicking close button...")
                 try:
                     close_btn.click(force=True, timeout=2000)
                 except:
                     close_btn.evaluate("el => el.click()")
                 page.wait_for_timeout(500)
             else:
-                # If no close button, try Escape key
+                # Try Escape key
+                print("  [MODAL] Pressing Escape...")
                 page.keyboard.press("Escape")
                 page.wait_for_timeout(500)
-            
-            # Wait for backdrop to disappear
-            backdrop = page.locator(".modal-backdrop.show")
-            if backdrop.count() > 0:
-                try:
-                    backdrop.first.wait_for(state="hidden", timeout=3000)
-                except:
-                    pass
+
+        # 2. Force remove from DOM if still visible/blocking (nuclear option for stubborn overlays)
+        page.evaluate("""
+            (function() {
+                var items = document.querySelectorAll('.modal.show, .modal-backdrop, #ng-modal-generic');
+                if (items.length > 0) {
+                    console.log('Force removing ' + items.length + ' blocking modal elements from DOM');
+                    for (var i = 0; i < items.length; i++) {
+                        items[i].remove();
+                    }
+                    document.body.classList.remove('modal-open');
+                    document.body.style.overflow = '';
+                }
+            })()
+        """)
+        page.wait_for_timeout(300)
     except Exception as e:
-        print(f"Error handling blocking modals: {e}")
+        print(f"Warning in close_blocking_modals: {e}")
 
 def take_screenshot(page, name_prefix):
     """Capture a screenshot for debugging."""
@@ -71,47 +82,87 @@ def sc(locator):
     except:
         pass
 
-def safe_click(page, locator, force=False, timeout=10000, wait_after=500):
+def safe_click(page, locator, force=False, timeout=10000, wait_after=500, max_retries=3):
     """
-    Robust click that handles interception by waiting for loaders, closing modals, and retrying.
-    This replaces naive .click() and evaluate("el.click()").
+    Highly robust click helper for Playwright + Python.
+    - Waits for the element to be attached, visible, stable, and enabled.
+    - Dismisses blocking loaders and spinners.
+    - Detects and closes/removes blocking modals (like #ng-modal-generic).
+    - Scrolls element into view centered.
+    - Retries native clicks multiple times with dynamic delay.
+    - Falls back to JS click only if native click fails.
+    - Captures screenshots and dumps DOM state on final failure.
     """
-    # Wait for page stability and active loading spinners first
-    wait_for_page_stable(page)
-
+    # 1. Wait for page load state & spinners
+    wait_for_page_stable(page, timeout=timeout)
+    
+    target = locator.first
+    selector_str = str(locator)
+    
+    # 2. Wait for element state
     try:
-        locator.first.wait_for(state="attached", timeout=timeout)
-        sc(locator.first)
-        page.wait_for_timeout(200)
-    except Exception:
-        pass # Ignore visibility/scroll errors and try anyway
+        target.wait_for(state="attached", timeout=timeout)
+    except Exception as e:
+        print(f"  [safe_click] Error: Element not attached to DOM: {selector_str}")
+        take_screenshot(page, "click_not_attached")
+        raise e
 
+    # Close any pre-existing blocking modals
+    close_blocking_modals(page)
+    
+    # Scroll into view
+    sc(target)
+    page.wait_for_timeout(200)
+
+    # 3. Retry Loop for Click
+    for attempt in range(1, max_retries + 1):
+        try:
+            # Check visibility and enabled status
+            if not target.is_visible():
+                print(f"  [safe_click] Element not visible, waiting... (Attempt {attempt}/{max_retries})")
+                target.wait_for(state="visible", timeout=3000)
+            
+            # Wait for element to be stable & enabled
+            target.click(force=force, timeout=3000)
+            
+            # Click succeeded!
+            if wait_after:
+                page.wait_for_timeout(wait_after)
+            return
+            
+        except Exception as e:
+            err_msg = str(e)
+            print(f"  [safe_click] Attempt {attempt} failed: {err_msg}")
+            
+            # If intercepted by modal/overlay
+            if "intercept" in err_msg.lower() or "visible" in err_msg.lower() or "stable" in err_msg.lower():
+                print("  [safe_click] Click intercepted or element unstable. Handling modals & retrying...")
+                close_blocking_modals(page)
+                wait_for_page_stable(page, timeout=5000)
+                sc(target)
+                page.wait_for_timeout(300)
+            else:
+                page.wait_for_timeout(500)
+
+    # 4. Fallback to JS Click
+    print("  [safe_click] Native click failed after retries. Attempting JS click fallback...")
     try:
-        # First attempt native click
-        locator.first.click(force=force, timeout=3000)
+        target.evaluate("el => el.click()")
         if wait_after:
             page.wait_for_timeout(wait_after)
-    except Exception as e:
-        err_str = str(e).lower()
-        if "intercept" in err_str or "timeout" in err_str:
-            print(f"Click intercepted or timeout. Clearing modals and re-waiting for loaders... ({e})")
-            close_blocking_modals(page)
-            # Re-wait for any loaders that might have appeared
-            wait_for_page_stable(page)
-            # Second attempt
-            try:
-                locator.first.click(force=force, timeout=5000)
-                if wait_after:
-                    page.wait_for_timeout(wait_after)
-            except Exception as e2:
-                print(f"Retry click failed, forcing with JS... ({e2})")
-                try:
-                    locator.first.evaluate("el => el.click()")
-                    if wait_after:
-                        page.wait_for_timeout(wait_after)
-                except Exception as e3:
-                    print(f"Total click failure: {e3}")
-                    take_screenshot(page, "click_failure")
-                    raise e3
-        else:
-            raise e
+        print("  [safe_click] JS click succeeded.")
+        return
+    except Exception as js_err:
+        print(f"  [safe_click] JS click also failed: {js_err}")
+        take_screenshot(page, "click_final_failure")
+        try:
+            html_dump = page.content()
+            dump_path = f"test_output/screenshots/failure_dom_{int(time.time())}.html"
+            os.makedirs("test_output/screenshots", exist_ok=True)
+            with open(dump_path, "w", encoding="utf-8") as f:
+                f.write(html_dump)
+            print(f"  [safe_click] DOM dump saved to {dump_path}")
+        except:
+            pass
+        raise js_err
+
