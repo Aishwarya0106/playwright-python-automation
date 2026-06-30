@@ -163,7 +163,7 @@ def upload_file_for_row(row, num_files=1):
                     print("        ⚠️ File input not found")
                     
             if upload_done and num_files > 1:
-                view_more = modal.locator("text='View more', .view-more-btn").first
+                view_more = modal.locator(":text('View more'), .view-more-btn").first
                 if view_more.count() > 0 and view_more.is_visible():
                     try:
                         view_more.click(timeout=3000)
